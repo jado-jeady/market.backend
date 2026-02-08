@@ -17,11 +17,11 @@ router.use(authenticate);
 router.get('/summary', getSalesSummary);
 
 // CASHIER can create sales and view their own sales
-router.post('/', authorize('CASHIER', 'ADMIN'), saleValidation, createSale);
+router.post('/', authorize('Cashier', 'Admin'), saleValidation, createSale);
 router.get('/my-sales', getAllSales); // Will filter by current user
 
 // ADMIN can view all sales
-router.get('/', authorize('ADMIN'), getAllSales);
-router.get('/:id', authorize('ADMIN', 'CASHIER'), getSaleById);
+router.get('/', authorize('Admin'), getAllSales);
+router.get('/:id', authorize('Admin', 'Cashier'), getSaleById);
 
 export default router;

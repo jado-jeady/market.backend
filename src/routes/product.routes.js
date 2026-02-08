@@ -21,8 +21,8 @@ router.get('/:id', getProductById);
 router.use(authenticate);
 
 // Product creation/modification requires ADMIN role
-router.post('/', authorize('ADMIN'), productValidation, createProduct);
-router.put('/:id', authorize('ADMIN'), productValidation, updateProduct);
-router.delete('/:id', authorize('ADMIN'), deleteProduct);
+router.post('/', authorize('Admin'), productValidation, createProduct);
+router.put('/:id', authorize('Admin'), productValidation, updateProduct);
+router.delete('/:id', authorize('Admin'), deleteProduct);
 
 export default router;

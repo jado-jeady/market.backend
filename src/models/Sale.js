@@ -1,61 +1,60 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
-class Sale extends Model {}
+class SaleItem extends Model {}
 
-Sale.init(
+SaleItem.init(
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
-    invoice_number: {
+
+    sale_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+
+    product_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+
+    product_name: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      comment: 'Snapshot of product name at sale time'
     },
-    user_id: {
+
+    barcode: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+
+    quantity: {
       type: DataTypes.INTEGER,
+      allowNull: false
+    },
+
+    unit_price: {
+      type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
-      references: {
-        model: 'users',
-        key: 'id'
-      }
+      comment: 'Price at time of sale'
     },
-    subtotal: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      defaultValue: 0
-    },
-    vat_total: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      defaultValue: 0
-    },
-    total_amount: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      defaultValue: 0
-    },
-    payment_method: {
-      type: DataTypes.ENUM('CASH', 'MOMO', 'CARD'),
-      defaultValue: 'CASH'
-    },
-    status: {
-      type: DataTypes.ENUM('COMPLETED', 'CANCELLED'),
-      defaultValue: 'COMPLETED'
+
+    total_price: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false
     }
   },
   {
     sequelize,
-    modelName: 'Sale',
-    tableName: 'sales',
-    timestamps: true,
-    underscored: true,
-    createdAt: 'created_at',
-    updatedAt: false
+    modelName: 'SaleItem',
+    tableName: 'sale_items',
+    timestamps: false,
+    underscored: true
   }
 );
 
-export default Sale;
+export default SaleItem;

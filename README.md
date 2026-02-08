@@ -17,15 +17,11 @@ Backend service for the marketplace application, providing APIs for product mana
 ### Installation
 ```bash
 npm install
-# or
-pip install -r requirements.txt
 ```
 
 ### Running Locally
 ```bash
 npm run dev
-# or
-python app.py
 ```
 
 ## Project Structure
@@ -57,4 +53,5 @@ npm test
 Follow the code style guidelines and submit pull requests.
 
 ## License
-MIT
+Masterpiece is licensed under the
+MIT License. See `LICENSE` file for details.

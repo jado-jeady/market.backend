@@ -15,11 +15,11 @@ export const register = async (req, res, next) => {
     }
 
     const { full_name, username, email, password, role } = req.body;
-
+    console.log(username);
     // Check if user exists
     const existingUser = await User.findOne({
       where: {
-        [db.Sequelize.Op.or]: [{ username }, { email }]
+        username : username
       }
     });
 
@@ -29,6 +29,7 @@ export const register = async (req, res, next) => {
         message: 'Username or email already exists'
       });
     }
+    console.log(full_name);
 
     // Create user
     const user = await User.create({
@@ -36,7 +37,7 @@ export const register = async (req, res, next) => {
       username,
       email,
       password_hash: password,
-      role: role || 'CASHIER'
+      role: role || 'Cashier'
     });
 
     // Generate token

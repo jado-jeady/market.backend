@@ -14,11 +14,12 @@ Product.init(
       type: DataTypes.STRING,
       allowNull: false
     },
-    barcode: {
+    sku: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       unique: true
     },
+    
     category_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -26,6 +27,12 @@ Product.init(
         model: 'categories',
         key: 'id'
       }
+    },
+
+    barcode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true
     },
     buying_price: {
       type: DataTypes.DECIMAL(10, 2),
@@ -41,7 +48,7 @@ Product.init(
         min: 0
       }
     },
-    stock_quantity: {
+    stock_quantity: { //initial_stock for creation, updated with transactions
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
@@ -57,10 +64,19 @@ Product.init(
       type: DataTypes.DATE,
       allowNull: true
     },
-    low_stock_threshold: {
+    min_stock: {
       type: DataTypes.INTEGER,
-      defaultValue: 10
+      defaultValue:10 
     },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    supplier: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+
     is_active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true

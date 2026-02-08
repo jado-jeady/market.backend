@@ -114,6 +114,8 @@ export const createProduct = async (req, res, next) => {
       stock_quantity,
       vat_category,
       expiry_date,
+      description,
+      supplier,
       low_stock_threshold,
       is_active
     } = req.body;
@@ -145,6 +147,10 @@ export const createProduct = async (req, res, next) => {
       stock_quantity: parseInt(stock_quantity),
       vat_category: vat_category || 'STANDARD',
       expiry_date: expiry_date || null,
+      description: description || null,
+      supplier: supplier || null,
+      min_stock: low_stock_threshold,
+      sku: `TGM-${Date.now()}`, // Simple SKU generation, can be improved
       low_stock_threshold: low_stock_threshold || 10,
       is_active: is_active !== undefined ? is_active : true
     });

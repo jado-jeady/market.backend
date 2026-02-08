@@ -41,8 +41,8 @@ User.init(
       allowNull: false
     },
     role: {
-      type: DataTypes.ENUM('ADMIN', 'CASHIER'),
-      defaultValue: 'CASHIER'
+      type: DataTypes.ENUM('Admin', 'Cashier'),
+      defaultValue: 'Cashier'
     },
     is_active: {
       type: DataTypes.BOOLEAN,

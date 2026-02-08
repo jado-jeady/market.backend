@@ -21,7 +21,7 @@ router.use(authenticate);
 // Category creation/modification requires ADMIN role
 router.post(
   '/',
-  authorize('ADMIN'),
+  authorize('Admin'),
   [
     body('name').notEmpty().withMessage('Category name is required'),
     body('description').optional()
@@ -31,7 +31,7 @@ router.post(
 
 router.put(
   '/:id',
-  authorize('ADMIN'),
+  authorize('Admin'),
   [
     body('name').optional(),
     body('description').optional()
@@ -39,6 +39,6 @@ router.put(
   updateCategory
 );
 
-router.delete('/:id', authorize('ADMIN'), deleteCategory);
+router.delete('/:id', authorize('Admin'), deleteCategory);
 
 export default router;
