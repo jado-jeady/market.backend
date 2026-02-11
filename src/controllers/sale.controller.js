@@ -1,15 +1,18 @@
 import db from '../models/index.js';
 import { validationResult } from 'express-validator';
+import { getProductById } from './product.controller.js';
 
 const { Sale, SaleItem, Product, User } = db;
-import { Sequelize } from 'sequelize';
+import { Sequelize,Op } from 'sequelize';
 
 export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
-  
+
   try {
-    const errors = validationResult(req);
+    const errors = validationResult(req.body);
+    
     if (!errors.isEmpty()) {
+      
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -91,6 +94,8 @@ export const createSale = async (req, res, next) => {
         product_id: product.id,
         quantity: item.quantity,
         unit_price: unitPrice,
+        product_name: product.name,
+        barcode: product.barcode,
         vat_amount: vatAmount,
         total_price: totalPrice
       });
@@ -112,6 +117,8 @@ export const createSale = async (req, res, next) => {
         invoice_number: invoiceNumber,
         user_id: userId,
         customer_id: customer_id || null,
+        customer_name: req.body.customer_name || null,
+        customer_phone: req.body.customer_phone || null,
         subtotal,
         vat_total: vatTotal,
         total_amount: totalAmount,
@@ -132,6 +139,7 @@ export const createSale = async (req, res, next) => {
     // Commit transaction
     await transaction.commit();
 
+    
     // Get sale with details
     const saleWithDetails = await Sale.findByPk(sale.id, {
       include: [
@@ -167,43 +175,47 @@ export const createSale = async (req, res, next) => {
 
 export const getAllSales = async (req, res, next) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
+    let {
+      page,
+      limit,
       start_date,
       end_date,
       user_id,
-      payment_method
+      payment_method,
+      cashier_id,
+      status
     } = req.query;
 
-    const offset = (page - 1) * limit;
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 30;
+    const offset = (pageNum - 1) * limitNum;
+
     const where = {};
 
-    // Date filter
+    /* Date filter */
     if (start_date || end_date) {
       where.created_at = {};
-      if (start_date) {
-        where.created_at[Sequelize.Op.gte] = new Date(start_date);
-      }
-      if (end_date) {
-        where.created_at[Sequelize.Op.lte] = new Date(end_date);
-      }
+      if (start_date) where.created_at[Op.gte] = new Date(start_date);
+      if (end_date) where.created_at[Op.lte] = new Date(end_date);
     }
 
-    // User filter
-    if (user_id) {
-      where.user_id = user_id;
-    }
+    /* Cashier filter */
+    
 
-    // Payment method filter
+    /* Payment method */
     if (payment_method) {
       where.payment_method = payment_method;
     }
 
-    const { count, rows: sales } = await Sale.findAndCountAll({
+    /* Status */
+    if (status) {
+      where.status = status;
+    }
+
+    const { count, rows } = await Sale.findAndCountAll({
       where,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit: limitNum,
+      offset,
       order: [['created_at', 'DESC']],
       include: [
         {
@@ -214,11 +226,89 @@ export const getAllSales = async (req, res, next) => {
         {
           model: SaleItem,
           as: 'items',
+          include: [{ model: Product, as: 'product' }]
+        }
+      ]
+    });
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(count / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    next(error);
+  }
+};
+
+
+export const getMySales = async (req, res, next) => {
+  try {
+    let { page, limit, start_date, end_date, payment_method, status } =
+      req.query;
+
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 10;
+    const offset = (pageNum - 1) * limitNum;
+
+    // ✅ Get cashier ID from token (NOT from query)
+    const cashierId = req.user.id;
+
+    const where = {
+      user_id: cashierId
+    };
+
+    console.log("Cashier ID:", cashierId);
+    /* ================= DATE FILTER ================= */
+
+    if (start_date || end_date) {
+      where.created_at = {};
+
+      if (start_date)
+        where.created_at[Op.gte] = new Date(start_date);
+
+      if (end_date)
+        where.created_at[Op.lte] = new Date(end_date);
+    }
+
+    /* ================= PAYMENT FILTER ================= */
+
+    if (payment_method) {
+      where.payment_method = payment_method;
+    }
+
+    /* ================= STATUS FILTER ================= */
+
+    if (status) {
+      where.status = status.toUpperCase();
+    }
+
+    /* ================= FETCH ================= */
+
+    const { count, rows } = await Sale.findAndCountAll({
+      where,
+      limit: limitNum,
+      offset,
+      order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "full_name"]
+        },
+        {
+          model: SaleItem,
+          as: "items",
           include: [
             {
               model: Product,
-              as: 'product',
-              attributes: ['id', 'name']
+              as: "product"
             }
           ]
         }
@@ -227,15 +317,16 @@ export const getAllSales = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: sales,
+      data: rows,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(count / limit)
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(count / limitNum)
       }
     });
   } catch (error) {
+    console.error("Get my sales error:", error);
     next(error);
   }
 };

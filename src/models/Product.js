@@ -87,14 +87,7 @@ Product.init(
     modelName: 'Product',
     tableName: 'products',
     timestamps: true,
-    underscored: true,
-    hooks: {
-      beforeValidate: (product) => {
-        if (product.selling_price <= product.buying_price) {
-          throw new Error('Selling price must be greater than buying price');
-        }
-      }
-    }
+    underscored: true
   }
 );
 

@@ -10,40 +10,41 @@ SaleItem.init(
       primaryKey: true,
       autoIncrement: true
     },
+
     sale_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'sales',
-        key: 'id'
-      }
-    },
-    product_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'products',
-        key: 'id'
-      }
-    },
-    quantity: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      validate: {
-        min: 1
-      }
-    },
-    unit_price: {
-      type: DataTypes.DECIMAL(10, 2),
       allowNull: false
     },
-    vat_amount: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      defaultValue: 0
+
+    product_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false
     },
+
+    product_name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      comment: 'Snapshot of product name at sale time'
+    },
+
+    barcode: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false
+    },
+
+    unit_price: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: false,
+      comment: 'Price at time of sale'
+    },
+
     total_price: {
-      type: DataTypes.DECIMAL(10, 2),
+      type: DataTypes.DECIMAL(12, 2),
       allowNull: false
     }
   },

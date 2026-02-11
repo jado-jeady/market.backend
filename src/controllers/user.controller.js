@@ -40,6 +40,24 @@ export const getUserById = async (req, res, next) => {
     next(error);
   }
 };
+//  Get all cashiers
+export const getCashiers = async (req, res, next) => {
+  try {
+    const cashiers = await User.findAll({
+      where: { role: 'Cashier' },
+      attributes: { exclude: ['password_hash'] },
+      order: [['created_at', 'DESC']]
+    });
+
+    res.json({
+      success: true,
+      data: cashiers
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const updateUser = async (req, res, next) => {
   try {

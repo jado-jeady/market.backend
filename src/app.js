@@ -8,6 +8,7 @@ import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
 import saleRoutes from './routes/sale.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import stockRoutes from './routes/stock.routes.js';
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
+app.use('/api/stock', stockRoutes);
 
 // 404 handler
 app.use((req, res) => {

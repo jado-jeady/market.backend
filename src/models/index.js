@@ -2,7 +2,8 @@ import sequelize from '../config/database.js';
 import User from './User.js';
 import Category from './Category.js';
 import Product from './Product.js';
-import Sale from './Sale.js';
+import Sale from './Sales.js';
+import StockAdjustment from './StockAdjustment.js';
 import SaleItem from './SaleItem.js';
 
 // Define relationships
@@ -37,6 +38,12 @@ SaleItem.belongsTo(Sale, {
   as: 'sale'
 });
 
+
+
+
+StockAdjustment.belongsTo(Product, { foreignKey: "product_id" });
+StockAdjustment.belongsTo(User, { foreignKey: "user_id" });
+
 // Product - SaleItem (One to Many)
 Product.hasMany(SaleItem, {
   foreignKey: 'product_id',
@@ -46,6 +53,10 @@ SaleItem.belongsTo(Product, {
   foreignKey: 'product_id',
   as: 'product'
 });
+
+Sale.hasMany(SaleItem, { foreignKey: 'sale_id' });
+SaleItem.belongsTo(Sale, { foreignKey: 'sale_id' });
+
 
 const db = {
   sequelize,

@@ -138,6 +138,19 @@ export const createProduct = async (req, res, next) => {
       });
     }
 
+    console.log('Creating product with data:', {
+      name,
+      barcode,
+      category_id,
+      buying_price,
+      selling_price,
+      stock_quantity,
+      vat_category,
+      expiry_date,
+      description,
+      supplier
+    });
+
     const product = await Product.create({
       name,
       barcode,
