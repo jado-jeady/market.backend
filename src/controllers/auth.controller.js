@@ -1,6 +1,7 @@
 import db from '../models/index.js';
 import { generateToken } from '../utils/jwt.js';
 import { validationResult } from 'express-validator';
+import bcrypt from 'bcryptjs';
 
 const { User } = db;
 
@@ -15,35 +16,34 @@ export const register = async (req, res, next) => {
     }
 
     const { full_name, username, email, password, role } = req.body;
-    console.log(username);
-    // Check if user exists
+
+    // Check if username exists
     const existingUser = await User.findOne({
-      where: {
-        username : username
-      }
+      where: { username }
     });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Username or email already exists'
+        message: 'Username already exists'
       });
     }
-    console.log(full_name);
+
+    // Hash password
+    const password_hash = await bcrypt.hash(password, 10);
 
     // Create user
     const user = await User.create({
       full_name,
       username,
       email,
-      password_hash: password,
-      role: role || 'Cashier'
+      password_hash,
+      role: role || 'Cashier',
+      is_active: true
     });
 
-    // Generate token
     const token = generateToken(user);
 
-    // Remove password from response
     const userResponse = {
       id: user.id,
       full_name: user.full_name,
@@ -61,10 +61,13 @@ export const register = async (req, res, next) => {
         token
       }
     });
+
   } catch (error) {
     next(error);
   }
 };
+
+
 
 export const login = async (req, res, next) => {
   try {
@@ -78,20 +81,19 @@ export const login = async (req, res, next) => {
 
     const { username, password } = req.body;
 
-    // Find user
     const user = await User.findOne({
-      where: { username, is_active: true }
+      where: { username }
     });
 
-    if (!user) {
+    if (!user || !user.is_active) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Account is disabled or invalid credentials'
       });
     }
 
-    // Check password
     const isValidPassword = await user.comparePassword(password);
+
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -99,10 +101,8 @@ export const login = async (req, res, next) => {
       });
     }
 
-    // Generate token
     const token = generateToken(user);
 
-    // Remove password from response
     const userResponse = {
       id: user.id,
       full_name: user.full_name,
@@ -120,10 +120,13 @@ export const login = async (req, res, next) => {
         token
       }
     });
+
   } catch (error) {
     next(error);
   }
 };
+
+
 
 export const getProfile = async (req, res, next) => {
   try {

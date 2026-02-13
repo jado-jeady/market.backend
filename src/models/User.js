@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 class User extends Model {
   static async hashPassword(password) {
     return await bcrypt.hash(password, 10);
-  }
+  } 
 
   async comparePassword(password) {
     return await bcrypt.compare(password, this.password_hash);
@@ -41,8 +41,14 @@ User.init(
       allowNull: false
     },
     role: {
-      type: DataTypes.ENUM('Admin', 'Cashier'),
+      type: DataTypes.ENUM('Admin', 'Cashier','Store-keeper'),
       defaultValue: 'Cashier'
+    },
+    shop_name:{
+      type: DataTypes.STRING,
+      defaultValue: 'masteryhub',
+      allowNull: true // change it back to false to syncronise items back the users created! 
+
     },
     is_active: {
       type: DataTypes.BOOLEAN,

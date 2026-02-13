@@ -5,6 +5,7 @@ const { User } = db;
 export const getAllUsers = async (req, res, next) => {
   try {
     const users = await User.findAll({
+      where: { is_active: true },   // 👈 IMPORTANT
       attributes: { exclude: ['password_hash'] },
       order: [['created_at', 'DESC']]
     });
@@ -17,6 +18,7 @@ export const getAllUsers = async (req, res, next) => {
     next(error);
   }
 };
+
 
 export const getUserById = async (req, res, next) => {
   try {
@@ -111,11 +113,10 @@ export const deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Prevent self-deletion
     if (req.user.id.toString() === id) {
       return res.status(400).json({
         success: false,
-        message: 'You cannot delete your own account'
+        message: 'You cannot deactivate your own account'
       });
     }
 
@@ -127,16 +128,18 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-    await user.destroy();
+    await user.update({ is_active: false });
 
     res.json({
       success: true,
-      message: 'User deleted successfully'
+      message: 'User disabled successfully'
     });
+
   } catch (error) {
     next(error);
   }
 };
+
 
 export const toggleUserStatus = async (req, res, next) => {
   try {
