@@ -1,6 +1,7 @@
 import db from '../models/index.js';
 import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
+import { Op } from 'sequelize';
 
 import User from '../models/User.js'; // Adjust path as needed
 import { generateToken } from '../utils/jwt.js'; // Adjust path as needed
