@@ -60,7 +60,7 @@ Product.init(
       type: DataTypes.ENUM('STANDARD', 'ZERO_RATED', 'EXEMPT'),
       defaultValue: 'STANDARD'
     },
-    expiry_date: {
+    expire_date: {
       type: DataTypes.DATE,
       allowNull: true
     },

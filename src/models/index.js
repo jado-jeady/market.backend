@@ -43,6 +43,7 @@ SaleItem.belongsTo(Sale, {
 
 StockAdjustment.belongsTo(Product, { foreignKey: "product_id" });
 StockAdjustment.belongsTo(User, { foreignKey: "user_id" });
+Product.hasMany(StockAdjustment, { foreignKey: 'product_id' });
 
 // Product - SaleItem (One to Many)
 Product.hasMany(SaleItem, {

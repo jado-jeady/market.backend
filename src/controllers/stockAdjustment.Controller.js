@@ -1,5 +1,6 @@
 import Product from "../models/Product.js";
 import StockAdjustment from "../models/StockAdjustment.js";
+import User from "../models/User.js";
 
 export const adjustStock = async (req, res) => {
   try {
@@ -55,3 +56,35 @@ export const adjustStock = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+// GETING STOCK ADJUSTMENTS
+
+
+export const getStockAdjustments = async (req, res) => {
+  try {
+    
+    const adjustments = await StockAdjustment.findAll({
+      include: [
+        {
+          model: Product,
+          attributes: ['name'], // Fetch product name for the table
+        },
+        {
+          model: User,
+          attributes: ['username'], // Optional: see who made the change
+        }
+      ],
+      order: [['created_at', 'DESC']], // Match your underscored: true config
+    });
+
+
+    const response =res.status(200).json(adjustments);
+    console.log(response)
+    return response;
+  } catch (error) {
+    console.error("Fetch Adjustment Error:", error);
+    res.status(500).json({ message: "Failed to retrieve stock history" });
+  }
+};
+

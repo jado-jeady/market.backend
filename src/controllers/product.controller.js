@@ -4,20 +4,24 @@ import { validationResult } from 'express-validator';
 
 const { Product, Category } = db;
 
+
+
 export const getAllProducts = async (req, res, next) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search = '',
-      category_id,
-      low_stock = false
-    } = req.query;
+    // 1. Parse and sanitize all query parameters immediately
+    // If they aren't numbers, provide safe defaults (1 and 100)
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 100);
+    const search = req.query.search || '';
+    const category_id = req.query.category_id;
+    const low_stock = req.query.low_stock;
 
+    // 2. Safe calculation for OFFSET (Prevents "column NaN" error)
     const offset = (page - 1) * limit;
+    
     const where = {};
 
-    // Search filter
+    // 3. Dynamic Search Filtering
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
@@ -25,22 +29,24 @@ export const getAllProducts = async (req, res, next) => {
       ];
     }
 
-    // Category filter
-    if (category_id) {
+    // 4. Category Filtering
+    if (category_id && category_id !== 'all') {
       where.category_id = category_id;
     }
 
-    // Low stock filter
+    // 5. Low Stock Logic
+    // Uses Sequelize.col to compare stock against its own min_stock threshold
     if (low_stock === 'true') {
       where.stock_quantity = {
-        [Op.lte]: db.sequelize.col('low_stock_threshold')
+        [Op.lte]: Product.sequelize.col('min_stock')
       };
     }
 
+    // 6. Execute Query with Includes
     const { count, rows: products } = await Product.findAndCountAll({
       where,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit,
+      offset,
       order: [['created_at', 'DESC']],
       include: [
         {
@@ -51,17 +57,21 @@ export const getAllProducts = async (req, res, next) => {
       ]
     });
 
+    // 7. Structured Response
     res.json({
       success: true,
       data: products,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         pages: Math.ceil(count / limit)
       }
     });
+
   } catch (error) {
+    console.error("Error in getAllProducts:", error);
+    // Pass the error to your global error handler
     next(error);
   }
 };
@@ -113,10 +123,10 @@ export const createProduct = async (req, res, next) => {
       selling_price,
       stock_quantity,
       vat_category,
-      expiry_date,
+      expire_date,
       description,
       supplier,
-      low_stock_threshold,
+      min_stock,
       is_active
     } = req.body;
 
@@ -146,7 +156,8 @@ export const createProduct = async (req, res, next) => {
       selling_price,
       stock_quantity,
       vat_category,
-      expiry_date,
+      expire_date,
+      min_stock,
       description,
       supplier
     });
@@ -159,12 +170,11 @@ export const createProduct = async (req, res, next) => {
       selling_price: parseFloat(selling_price),
       stock_quantity: parseInt(stock_quantity),
       vat_category: vat_category || 'STANDARD',
-      expiry_date: expiry_date || null,
+      expire_date: expire_date || null,
       description: description || null,
       supplier: supplier || null,
-      min_stock: low_stock_threshold,
+      min_stock: min_stock,
       sku: `TGM-${Date.now()}`, // Simple SKU generation, can be improved
-      low_stock_threshold: low_stock_threshold || 10,
       is_active: is_active !== undefined ? is_active : true
     });
 
@@ -180,6 +190,7 @@ export const createProduct = async (req, res, next) => {
 
 export const updateProduct = async (req, res, next) => {
   try {
+    console.log(req.body)
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -187,9 +198,11 @@ export const updateProduct = async (req, res, next) => {
         errors: errors.array()
       });
     }
+    
 
     const { id } = req.params;
     const updates = req.body;
+    console.log(updates)
 
     const product = await Product.findByPk(id);
     if (!product) {
