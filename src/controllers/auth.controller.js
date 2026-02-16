@@ -1,12 +1,13 @@
 import db from '../models/index.js';
-import { generateToken } from '../utils/jwt.js';
 import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
 
-const { User } = db;
+import User from '../models/User.js'; // Adjust path as needed
+import { generateToken } from '../utils/jwt.js'; // Adjust path as needed
 
 export const register = async (req, res, next) => {
   try {
+    // 1. Validate request
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -15,41 +16,48 @@ export const register = async (req, res, next) => {
       });
     }
 
-    const { full_name, username, email, password, role } = req.body;
+    const { full_name, username, email, password, role, shop_name } = req.body;
 
-    // Check if username exists
+    // 2. Check if username or email already exists
     const existingUser = await User.findOne({
-      where: { username }
+      where: { 
+        [Op.or]: [{ username }, { email }] 
+      }
     });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Username already exists'
+        message: 'Username or Email already in use'
       });
     }
 
-    // Hash password
-    const password_hash = await bcrypt.hash(password, 10);
-
-    // Create user
+    /**
+     * FIX: Pass the plain 'password' into 'password_hash'.
+     * DO NOT use bcrypt.hash() here because your User model has a 
+     * 'beforeCreate' hook that will hash it for you.
+     */
     const user = await User.create({
       full_name,
       username,
       email,
-      password_hash,
+      password_hash: password, // The hook handles the hashing
       role: role || 'Cashier',
+      shop_name: shop_name || 'masteryhub',
       is_active: true
     });
 
+    // 3. Generate Auth Token
     const token = generateToken(user);
 
+    // 4. Prepare response (excluding sensitive data)
     const userResponse = {
       id: user.id,
       full_name: user.full_name,
       username: user.username,
       email: user.email,
       role: user.role,
+      shop_name: user.shop_name,
       is_active: user.is_active
     };
 
@@ -63,6 +71,7 @@ export const register = async (req, res, next) => {
     });
 
   } catch (error) {
+    // Pass unexpected errors to the global error handler
     next(error);
   }
 };
