@@ -81,6 +81,7 @@ export const login = async (req, res, next) => {
 
     const { username, password } = req.body;
 
+
     const user = await User.findOne({
       where: { username }
     });
@@ -91,8 +92,10 @@ export const login = async (req, res, next) => {
         message: 'Account is disabled or invalid credentials'
       });
     }
-
+    
+    console.log(`username before ${username} password ${password}`);
     const isValidPassword = await user.comparePassword(password);
+    console.log("compare password Out PUT:"+isValidPassword);
 
     if (!isValidPassword) {
       return res.status(401).json({
