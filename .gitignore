@@ -10,7 +10,7 @@ pnpm-debug.log
 .env
 .env.local
 .env.*.local
-
+*.sql
 # IDE
 .vscode/
 .idea/

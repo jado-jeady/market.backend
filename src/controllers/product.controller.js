@@ -11,7 +11,7 @@ export const getAllProducts = async (req, res, next) => {
     // 1. Parse and sanitize all query parameters immediately
     // If they aren't numbers, provide safe defaults (1 and 100)
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, parseInt(req.query.limit) || 100);
+    const limit = Math.max(1, parseInt(req.query.limit) || 1000000000000);
     const search = req.query.search || '';
     const category_id = req.query.category_id;
     const low_stock = req.query.low_stock;
