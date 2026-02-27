@@ -41,7 +41,7 @@ User.init(
       allowNull: false
     },
     role: {
-      type: DataTypes.ENUM('Admin', 'Cashier','Store-keeper'),
+      type: DataTypes.ENUM('Admin', 'Cashier','Storekeeper'),
       defaultValue: 'Cashier'
     },
     shop_name:{

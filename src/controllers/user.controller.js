@@ -128,7 +128,7 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-    await user.update({ is_active: false });
+    await user.update({ is_active: false }, { method: 'PATCH' });
 
     res.json({
       success: true,

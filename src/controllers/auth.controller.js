@@ -18,6 +18,7 @@ export const register = async (req, res, next) => {
     }
 
     const { full_name, username, email, password, role, shop_name } = req.body;
+    console.log(req.body.role+"this is the role");
 
     // 2. Check if username or email already exists
     const existingUser = await User.findOne({
@@ -49,8 +50,9 @@ export const register = async (req, res, next) => {
     });
 
     // 3. Generate Auth Token
+    
+console.log(user.role+"this is the user role");
     const token = generateToken(user);
-
     // 4. Prepare response (excluding sensitive data)
     const userResponse = {
       id: user.id,

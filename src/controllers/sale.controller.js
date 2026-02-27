@@ -2,6 +2,7 @@ import db from '../models/index.js';
 import { validationResult } from 'express-validator';
 import { getProductById } from './product.controller.js';
 
+
 const { Sale, SaleItem, Product, User } = db;
 import { Sequelize,Op } from 'sequelize';
 
@@ -19,10 +20,12 @@ export const createSale = async (req, res, next) => {
         errors: errors.array()
       });
     }
+    
+
 
     const { items, payment_method, customer_id } = req.body;
     const userId = req.user.id;
-
+    
     // Generate invoice number (YYYYMMDD-XXXXX)
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
@@ -98,6 +101,7 @@ export const createSale = async (req, res, next) => {
         barcode: product.barcode,
         vat_amount: vatAmount,
         total_price: totalPrice
+        
       });
 
       // Update product stock
@@ -123,7 +127,7 @@ export const createSale = async (req, res, next) => {
         vat_total: vatTotal,
         total_amount: totalAmount,
         payment_method,
-        status: 'COMPLETED'
+        status: 'COMPLETED',
       },
       { transaction }
     );
@@ -254,7 +258,7 @@ export const getMySales = async (req, res, next) => {
       req.query;
 
     const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 10;
+    const limitNum = Number(limit) || Number.MAX_SAFE_INTEGER;
     const offset = (pageNum - 1) * limitNum;
 
     // ✅ Get cashier ID from token (NOT from query)

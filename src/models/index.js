@@ -5,6 +5,7 @@ import Product from './Product.js';
 import Sale from './Sales.js';
 import StockAdjustment from './StockAdjustment.js';
 import SaleItem from './SaleItem.js';
+import Shift from './Shifts.js';
 
 // Define relationships
 
@@ -58,6 +59,11 @@ SaleItem.belongsTo(Product, {
 Sale.hasMany(SaleItem, { foreignKey: 'sale_id' });
 SaleItem.belongsTo(Sale, { foreignKey: 'sale_id' });
 
+// Sale.belongsTo(Shift, { foreignKey: "shift_id" });
+// Shift.hasMany(Sale, { foreignKey: "shift_id" });
+
+// Shift.belongsTo(User, { foreignKey: "id" });
+// User.hasMany(Shift, { foreignKey: "shift_id" });
 
 const db = {
   sequelize,

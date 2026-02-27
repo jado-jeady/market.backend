@@ -9,6 +9,7 @@ import productRoutes from './routes/product.routes.js';
 import saleRoutes from './routes/sale.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import stockRoutes from './routes/stock.routes.js';
+import ShiftRoutes from './routes/shift.routes.js'
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/stock', stockRoutes);
+app.use('/api/shift',ShiftRoutes)
 
 // 404 handler
 app.use((req, res) => {
