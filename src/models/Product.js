@@ -34,6 +34,15 @@ Product.init(
       allowNull: false,
       unique: true
     },
+    product_type: {
+  type: DataTypes.ENUM('NORMAL', 'Consumable', 'Service'),
+  defaultValue: 'NORMAL'
+},
+
+track_stock: {
+  type: DataTypes.BOOLEAN,
+  defaultValue: true
+},
     buying_price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
@@ -60,6 +69,7 @@ Product.init(
       type: DataTypes.ENUM('STANDARD', 'ZERO_RATED', 'EXEMPT'),
       defaultValue: 'STANDARD'
     },
+    
     expire_date: {
       type: DataTypes.DATE,
       allowNull: true
@@ -81,6 +91,7 @@ Product.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true
     }
+
   },
   {
     sequelize,

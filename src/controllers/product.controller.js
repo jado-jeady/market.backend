@@ -2,26 +2,28 @@ import db from '../models/index.js';
 import { Op } from 'sequelize';
 import { validationResult } from 'express-validator';
 
-const { Product, Category } = db;
+const { Product, Category, SaleItem } = db;
 
-
-
+/* =====================================================
+   GET ALL PRODUCTS (WITH FILTERS + PAGINATION)
+===================================================== */
 export const getAllProducts = async (req, res, next) => {
   try {
-    // 1. Parse and sanitize all query parameters immediately
-    // If they aren't numbers, provide safe defaults (1 and 100)
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, parseInt(req.query.limit) || 1000000000000);
-    const search = req.query.search || '';
-    const category_id = req.query.category_id;
-    const low_stock = req.query.low_stock;
-
-    // 2. Safe calculation for OFFSET (Prevents "column NaN" error)
+    const limit = Math.max(1, parseInt(req.query.limit) || 50);
     const offset = (page - 1) * limit;
-    
+
+    const {
+      search,
+      category_id,
+      low_stock,
+      product_type,
+      is_active
+    } = req.query;
+
     const where = {};
 
-    // 3. Dynamic Search Filtering
+    /* 🔎 SEARCH */
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
@@ -29,21 +31,31 @@ export const getAllProducts = async (req, res, next) => {
       ];
     }
 
-    // 4. Category Filtering
+    /* 📂 CATEGORY FILTER */
     if (category_id && category_id !== 'all') {
       where.category_id = category_id;
     }
 
-    // 5. Low Stock Logic
-    // Uses Sequelize.col to compare stock against its own min_stock threshold
+    /* 🧃 PRODUCT TYPE FILTER */
+    if (product_type) {
+      where.product_type = product_type;
+    }
+
+    /* 📉 LOW STOCK */
     if (low_stock === 'true') {
       where.stock_quantity = {
         [Op.lte]: Product.sequelize.col('min_stock')
       };
     }
 
-    // 6. Execute Query with Includes
-    const { count, rows: products } = await Product.findAndCountAll({
+    /* 🟢 ACTIVE FILTER */
+    if (is_active !== undefined) {
+      where.is_active = is_active === 'true';
+    } else {
+      where.is_active = true;
+    }
+
+    const { count, rows } = await Product.findAndCountAll({
       where,
       limit,
       offset,
@@ -57,10 +69,9 @@ export const getAllProducts = async (req, res, next) => {
       ]
     });
 
-    // 7. Structured Response
-    res.json({
+    return res.json({
       success: true,
-      data: products,
+      data: rows,
       pagination: {
         total: count,
         page,
@@ -70,16 +81,18 @@ export const getAllProducts = async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error("Error in getAllProducts:", error);
-    // Pass the error to your global error handler
+    console.error('Error fetching products:', error);
     next(error);
   }
 };
 
+
+/* =====================================================
+   GET PRODUCT BY ID
+===================================================== */
 export const getProductById = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const product = await Product.findByPk(id, {
+    const product = await Product.findByPk(req.params.id, {
       include: [
         {
           model: Category,
@@ -96,15 +109,17 @@ export const getProductById = async (req, res, next) => {
       });
     }
 
-    res.json({
-      success: true,
-      data: product
-    });
+    res.json({ success: true, data: product });
+
   } catch (error) {
     next(error);
   }
 };
 
+
+/* =====================================================
+   CREATE PRODUCT
+===================================================== */
 export const createProduct = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -127,19 +142,20 @@ export const createProduct = async (req, res, next) => {
       description,
       supplier,
       min_stock,
-      is_active
+      product_type,
+      track_stock
     } = req.body;
 
-    // Check if barcode exists
-    const existingProduct = await Product.findOne({ where: { barcode } });
-    if (existingProduct) {
+    /* 🚫 Barcode must be unique */
+    const existing = await Product.findOne({ where: { barcode } });
+    if (existing) {
       return res.status(400).json({
         success: false,
-        message: 'Product with this barcode already exists'
+        message: 'Barcode already exists'
       });
     }
 
-    // Check if category exists
+    /* 📂 Category must exist */
     const category = await Category.findByPk(category_id);
     if (!category) {
       return res.status(400).json({
@@ -148,34 +164,22 @@ export const createProduct = async (req, res, next) => {
       });
     }
 
-    console.log('Creating product with data:', {
-      name,
-      barcode,
-      category_id,
-      buying_price,
-      selling_price,
-      stock_quantity,
-      vat_category,
-      expire_date,
-      min_stock,
-      description,
-      supplier
-    });
-
     const product = await Product.create({
       name,
       barcode,
       category_id,
-      buying_price: parseFloat(buying_price),
+      buying_price: buying_price ? parseFloat(buying_price) : 0,
       selling_price: parseFloat(selling_price),
-      stock_quantity: parseInt(stock_quantity),
+      stock_quantity: track_stock === false ? 0 : parseInt(stock_quantity || 0),
       vat_category: vat_category || 'STANDARD',
       expire_date: expire_date || null,
       description: description || null,
       supplier: supplier || null,
-      min_stock: min_stock,
-      sku: `TGM-${Date.now()}`, // Simple SKU generation, can be improved
-      is_active: is_active !== undefined ? is_active : true
+      min_stock: min_stock || 10,
+      product_type: product_type || 'NORMAL',
+      track_stock: track_stock !== false,
+      sku: `TGM-${Date.now()}`,
+      is_active: true
     });
 
     res.status(201).json({
@@ -183,28 +187,20 @@ export const createProduct = async (req, res, next) => {
       message: 'Product created successfully',
       data: product
     });
+
   } catch (error) {
     next(error);
   }
 };
 
+
+/* =====================================================
+   UPDATE PRODUCT
+===================================================== */
 export const updateProduct = async (req, res, next) => {
   try {
-    console.log(req.body)
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
-    }
-    
+    const product = await Product.findByPk(req.params.id);
 
-    const { id } = req.params;
-    const updates = req.body;
-    console.log(updates)
-
-    const product = await Product.findByPk(id);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -212,36 +208,41 @@ export const updateProduct = async (req, res, next) => {
       });
     }
 
-    // Check if barcode is being updated and if it already exists
-    if (updates.barcode && updates.barcode !== product.barcode) {
-      const existingProduct = await Product.findOne({
-        where: { barcode: updates.barcode }
+    /* 🚫 Prevent duplicate barcode */
+    if (req.body.barcode && req.body.barcode !== product.barcode) {
+      const exists = await Product.findOne({
+        where: { barcode: req.body.barcode }
       });
-      if (existingProduct) {
+
+      if (exists) {
         return res.status(400).json({
           success: false,
-          message: 'Product with this barcode already exists'
+          message: 'Barcode already exists'
         });
       }
     }
 
-    await product.update(updates);
+    await product.update(req.body);
 
     res.json({
       success: true,
       message: 'Product updated successfully',
       data: product
     });
+
   } catch (error) {
     next(error);
   }
 };
 
+
+/* =====================================================
+   DELETE PRODUCT
+===================================================== */
 export const deleteProduct = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const product = await Product.findByPk(req.params.id);
 
-    const product = await Product.findByPk(id);
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -249,37 +250,42 @@ export const deleteProduct = async (req, res, next) => {
       });
     }
 
-    // Check if product has sales
-    const hasSales = await db.SaleItem.findOne({
-      where: { product_id: id }
+    const hasSales = await SaleItem.findOne({
+      where: { product_id: product.id }
     });
 
     if (hasSales) {
-      // Soft delete (deactivate) instead of hard delete
       await product.update({ is_active: false });
+
       return res.json({
         success: true,
-        message: 'Product deactivated successfully (has existing sales)'
+        message: 'Product deactivated (has sales history)'
       });
     }
 
-    // Hard delete if no sales
     await product.destroy();
 
     res.json({
       success: true,
       message: 'Product deleted successfully'
     });
+
   } catch (error) {
     next(error);
   }
 };
 
+
+/* =====================================================
+   GET PRODUCT BY BARCODE (POS SAFE)
+===================================================== */
 export const getProductByBarcode = async (req, res, next) => {
   try {
-    const { barcode } = req.params;
     const product = await Product.findOne({
-      where: { barcode },
+      where: {
+        barcode: req.params.barcode,
+        is_active: true
+      },
       include: [
         {
           model: Category,
@@ -296,11 +302,23 @@ export const getProductByBarcode = async (req, res, next) => {
       });
     }
 
+    /* 🚫 Prevent selling out-of-stock items */
+    if (product.track_stock && product.stock_quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product is out of stock'
+      });
+    }
+
     res.json({
       success: true,
       data: product
     });
+
   } catch (error) {
     next(error);
   }
 };
+
+
+// for production controllers

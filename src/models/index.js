@@ -6,8 +6,12 @@ import Sale from './Sales.js';
 import StockAdjustment from './StockAdjustment.js';
 import SaleItem from './SaleItem.js';
 import Shift from './Shifts.js';
+import Production from './Productions.js';
+import ProductionItem from './ProductionItems.js';
 
 // Define relationships
+
+
 
 // Category - Product (One to Many)
 Category.hasMany(Product, {
@@ -65,13 +69,57 @@ SaleItem.belongsTo(Sale, { foreignKey: 'sale_id' });
 // Shift.belongsTo(User, { foreignKey: "id" });
 // User.hasMany(Shift, { foreignKey: "shift_id" });
 
+
+// Production ↔ ProductionItem
+Production.hasMany(ProductionItem, {
+  foreignKey: 'production_id',
+  as: 'items',
+});
+
+ProductionItem.belongsTo(Production, {
+  foreignKey: 'production_id',
+  as: 'production',
+});
+
+// Who submitted
+Production.belongsTo(User, {
+  foreignKey: 'submitted_by',
+  as: 'submittedBy',
+});
+
+// Who approved
+Production.belongsTo(User, {
+  foreignKey: 'approved_by',
+  as: 'approvedBy',
+});
+
+// Who rejected
+Production.belongsTo(User, {
+  foreignKey: 'rejected_by',
+  as: 'rejectedBy',
+});
+// ProductionItem ↔ Product
+ProductionItem.belongsTo(Product, {
+  foreignKey: 'product_id',
+  as: 'product',
+});
+
+Product.hasMany(ProductionItem, {
+  foreignKey: 'product_id',
+  as: 'production_items',
+});
+
 const db = {
   sequelize,
   User,
   Category,
   Product,
   Sale,
-  SaleItem
+  SaleItem,
+  StockAdjustment,
+  Shift,
+  Production,
+  ProductionItem
 };
 
 export default db;

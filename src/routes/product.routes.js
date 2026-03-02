@@ -1,4 +1,5 @@
 import express from 'express';
+
 import {
   getAllProducts,
   getProductById,
@@ -12,7 +13,7 @@ import { productValidation } from '../utils/validators.js';
 
 const router = express.Router();
 
-// Public routes
+
 router.get('/', getAllProducts);
 router.get('/barcode/:barcode', getProductByBarcode);
 router.get('/:id', getProductById);
