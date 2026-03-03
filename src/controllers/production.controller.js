@@ -287,43 +287,42 @@ export const getProductionReport = async (req, res, next) => {
 // get all productions
 export const getAllProductions = async (req, res, next) => {
   try {
-    console.log('getAllProductions sateeeeeeeeeeeeeeeeeeeeeeeeeee');
-    const productions = await Production.findAll({
-      order: [['created_at', 'DESC']],
+    // Pagination params from query string
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const { count, rows: productions } = await Production.findAndCountAll({
+      order: [["created_at", "DESC"]],
+      limit,
+      offset,
+      attributes: ["id", "status", "created_at", "approved_at","approved_by", "approval_note", "submitted_by", "rejected_by", "rejection_reason", "rejected_at",],
+
       include: [
         {
           model: ProductionItem,
-          as: 'items',
+          as: "items",
+          separate: true, // avoids huge join queries
+          attributes: ["id", "product_id", "quantity", "production_time", "notes"],
           include: {
             model: Product,
-            as: 'product',
-            attributes: ['id', 'name']
-          }
+            as: "product",
+            attributes: ["id", "name", "barcode", "selling_price"],
+          },
         },
-        {
-          model: User,
-          as: 'submittedBy',
-          attributes: ['id', 'full_name', 'username']
-        },
-        {
-          model: User,
-          as: 'approvedBy',
-          attributes: ['id', 'full_name', 'username']
-        },
-        {
-          model: User,
-          as: 'rejectedBy',
-          attributes: ['id', 'full_name', 'username']
-        }
-      ]
+        { model: User, as: "submittedBy", attributes: ["id", "full_name", "username"] },
+        { model: User, as: "approvedBy", attributes: ["id", "full_name", "username"] },
+        { model: User, as: "rejectedBy", attributes: ["id", "full_name", "username"] },
+      ],
     });
 
     res.json({
       success: true,
-      total: productions.length,
-      data: productions
+      total: count,
+      page,
+      limit,
+      data: productions,
     });
-
   } catch (error) {
     next(error);
   }
