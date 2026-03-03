@@ -6,6 +6,7 @@ import {
   rejectProduction,
   getApprovedProductions,
   getRejectedProductions,
+  abortProduction,
   getAllProductions,
   getProductionReport
 } from '../controllers/production.controller.js';
@@ -20,6 +21,9 @@ router.get('/productions', authenticate, getAllProductions);
 router.patch('/production/:id/approve', authenticate, approveProduction);
 router.patch('/production/:id/reject', authenticate, rejectProduction);
 router.get('/production/approved', authenticate, getApprovedProductions);
+router.delete("/production/:id", authenticate, abortProduction);
+
+
 router.get('/production/rejected', authenticate, getRejectedProductions);
 router.get('/production/report', authenticate, getProductionReport);
 

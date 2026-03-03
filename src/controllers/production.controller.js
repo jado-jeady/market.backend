@@ -327,3 +327,35 @@ export const getAllProductions = async (req, res, next) => {
     next(error);
   }
 };
+
+// abort production
+export const abortProduction = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const production = await Production.findByPk(id);
+
+    if (!production) {
+      return res.status(404).json({
+        success: false,
+        message: "Production not found",
+      });
+    }
+
+    if (production.status !== "PENDING") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending productions can be aborted",
+      });
+    }
+
+    await production.destroy();
+
+    res.json({
+      success: true,
+      message: "Production batch Aborted successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
