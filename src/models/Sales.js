@@ -1,5 +1,6 @@
-import { Model, DataTypes } from 'sequelize';
-import sequelize from '../config/database.js';
+import { Model, DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
+import Shift from "./Shifts.js";
 
 class Sale extends Model {}
 
@@ -8,66 +9,76 @@ Sale.init(
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true
+      autoIncrement: true,
     },
 
     invoice_number: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
     },
 
     user_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      comment: 'Cashier who made the sale'
+      comment: "Cashier who made the sale",
+    },
+
+    shift_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: "shifts",
+        key: "id",
+      },
+      onDelete: "CASCADE",
     },
 
     customer_name: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
     },
 
     customer_phone: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
     },
 
     payment_method: {
-      type: DataTypes.ENUM('cash', 'momo', 'card'),
-      allowNull: false
+      type: DataTypes.ENUM("cash", "momo", "card"),
+      allowNull: false,
     },
 
     status: {
-      type: DataTypes.ENUM('COMPLETED', 'CANCELLED', 'REFUNDED'),
-      defaultValue: 'COMPLETED'
+      type: DataTypes.ENUM("COMPLETED", "CANCELLED", "REFUNDED"),
+      defaultValue: "COMPLETED",
     },
 
-    /* OPTIONAL but RECOMMENDED for audits */
     subtotal: {
       type: DataTypes.DECIMAL(12, 2),
-      allowNull: false
+      allowNull: false,
     },
 
     vat_total: {
       type: DataTypes.DECIMAL(12, 2),
-      allowNull: false
+      allowNull: false,
     },
 
     total_amount: {
       type: DataTypes.DECIMAL(12, 2),
-      allowNull: false
-    }
+      allowNull: false,
+    },
   },
   {
     sequelize,
-    modelName: 'Sale',
-    tableName: 'sales',
+    modelName: "Sale",
+    tableName: "sales",
     timestamps: true,
     underscored: true,
-    createdAt: 'created_at',
-    updatedAt: false
+    createdAt: "created_at",
+    updatedAt: false,
   }
 );
+
 
 export default Sale;

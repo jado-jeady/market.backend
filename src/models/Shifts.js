@@ -6,7 +6,7 @@ class Shift extends Model {}
 
 Shift.init(
   {
-    shift_id: {
+    id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
@@ -16,14 +16,16 @@ Shift.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: "users",
+        model: User, // direct reference to User model
         key: "id",
       },
+      onDelete: "CASCADE", // if cashier is deleted, remove shifts
     },
 
     opening_balance: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
+      defaultValue: 0.0,
     },
 
     closing_balance: {
@@ -33,7 +35,7 @@ Shift.init(
 
     total_sales: {
       type: DataTypes.DECIMAL(12, 2),
-      defaultValue: 0,
+      defaultValue: 0.0,
     },
 
     expected_balance: {
@@ -47,7 +49,7 @@ Shift.init(
     },
 
     status: {
-      type: DataTypes.ENUM("OPEN", "CLOSED"),
+      type: DataTypes.ENUM("OPEN", "CLOSED", "ABORTED"),
       defaultValue: "OPEN",
     },
 
@@ -70,8 +72,8 @@ Shift.init(
     sequelize,
     modelName: "Shift",
     tableName: "shifts",
-    timestamps: true,
-    underscored: true,
+    timestamps: true, // adds created_at and updated_at
+    underscored: true, // snake_case columns
   }
 );
 

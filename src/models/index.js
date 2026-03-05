@@ -109,6 +109,12 @@ Product.hasMany(ProductionItem, {
   as: 'production_items',
 });
 
+// In Shift.js
+Shift.hasMany(Sale, { foreignKey: "shift_id", as: "sales" });
+
+// In Sale.js
+Sale.belongsTo(Shift, { foreignKey: "shift_id", as: "shift" });
+
 const db = {
   sequelize,
   User,
