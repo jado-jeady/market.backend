@@ -124,9 +124,12 @@ export const login = async (req, res, next) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      is_active: user.is_active
+      is_active: user.is_active,
+      shop_name: user.shop_name
     };
-
+    
+    console.log(userResponse);
+    console.log({userResponse:userResponse})
     res.json({
       success: true,
       message: 'Login successful',

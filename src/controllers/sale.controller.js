@@ -124,6 +124,7 @@ export const createSale = async (req, res, next) => {
         customer_name: req.body.customer_name || null,
         customer_phone: req.body.customer_phone || null,
         subtotal,
+        shift_id: req.body.shift_id,
         vat_total: vatTotal,
         total_amount: totalAmount,
         payment_method,

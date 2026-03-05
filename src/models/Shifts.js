@@ -16,10 +16,26 @@ Shift.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: User, // direct reference to User model
+        model: User,
         key: "id",
       },
-      onDelete: "CASCADE", // if cashier is deleted, remove shifts
+      onDelete: "CASCADE",
+    },
+
+    business_date: {
+      type: DataTypes.DATEONLY, // e.g., "2026-03-03"
+      allowNull: false,
+      comment: "Logical business date for reporting",
+    },
+
+    start_time: {
+      type: DataTypes.DATE,
+      allowNull: false,
+    },
+
+    end_time: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
 
     opening_balance: {
@@ -72,8 +88,8 @@ Shift.init(
     sequelize,
     modelName: "Shift",
     tableName: "shifts",
-    timestamps: true, // adds created_at and updated_at
-    underscored: true, // snake_case columns
+    timestamps: true,
+    underscored: true,
   }
 );
 
