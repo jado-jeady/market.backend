@@ -114,6 +114,11 @@ Shift.hasMany(Sale, { foreignKey: "shift_id", as: "sales" });
 
 // In Sale.js
 Sale.belongsTo(Shift, { foreignKey: "shift_id", as: "shift" });
+// shift to user relationship
+User.hasMany(Shift, { foreignKey: "user_id", as: "shifts" });
+Shift.belongsTo(User, { foreignKey: "user_id", as: "user" });
+
+
 
 const db = {
   sequelize,

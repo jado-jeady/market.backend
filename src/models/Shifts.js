@@ -28,24 +28,22 @@ Shift.init(
       comment: "Logical business date for reporting",
     },
 
-    start_time: {
-      type: DataTypes.DATE,
-      allowNull: false,
-    },
-
-    end_time: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-
     opening_balance: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0.0,
     },
+    opening_note: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
 
     closing_balance: {
       type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+    },
+    closing_note: {
+      type: DataTypes.TEXT,
       allowNull: true,
     },
 
@@ -81,7 +79,7 @@ Shift.init(
 
     shop_name: {
       type: DataTypes.STRING,
-      defaultValue: "Tygamarket",
+      defaultValue: "Tyga_market",
     },
   },
   {

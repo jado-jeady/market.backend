@@ -1,11 +1,12 @@
-import Shift from "../models/Shifts.js";
-import Sale from "../models/Sales.js";
+import db from "../models/index.js";
 import { Op } from "sequelize";
+
+const { Shift, Sale, User } = db;
 
 /* ================= OPEN SHIFT ================= */
 export const openShift = async (req, res) => {
   try {
-    const { opening_balance, start_time, end_time } = req.body;
+    const { opening_balance, start_time, end_time, opening_note } = req.body;
     console.log("this is the body", req.body);
     const cashier_id = req.user.id;
     const shop_name = 'Tygamarket';
@@ -47,6 +48,7 @@ export const openShift = async (req, res) => {
       shop_name,
       start_time,
       end_time,
+      opening_note,
       business_date: businessDate,
       opened_at: new Date(),
     });
@@ -88,17 +90,85 @@ export const getCurrentShift = async (req, res) => {
 };
 
 /* ================= GET ALL SHIFTS ================= */
+
+
 export const getAllShifts = async (req, res) => {
   try {
-    const shifts = await Shift.findAll({
-      include: {
-        association: "cashier",
-        attributes: ["full_name", "username"],
-      },
-      order: [["created_at", "DESC"]],
-    });
+    let {
+      page,
+      limit,
+      start_date,
+      end_date,
+      cashier_id,
+      status,
+      shop_name,
+    } = req.query;
 
-    return res.json({ success: true, data: shifts });
+
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 30;
+    const offset = (pageNum - 1) * limitNum;
+
+    const where = {};
+
+    /* Date filter (business_date or created_at) */
+    if (start_date || end_date) {
+      where.created_at = {};
+      if (start_date) {
+        where.created_at[Op.gte] = new Date(`${start_date}T00:00:00`);
+      }
+      if (end_date) {
+        where.created_at[Op.lte] = new Date(`${end_date}T23:59:59`);
+      }
+    }
+
+    /* Cashier filter */
+    if (cashier_id) {
+      where.user_id = cashier_id;
+    }
+
+    /* Status filter */
+    if (status) {
+      where.status = status;
+    }
+
+    /* Shop filter */
+    if (shop_name) {
+      where.shop_name = shop_name;
+    }
+
+    const { count, rows } = await Shift.findAndCountAll({
+      where,
+      limit: limitNum,
+      offset,
+      order: [["created_at", "DESC"]],
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "full_name", "username"],
+        },
+        {
+          model: Sale,
+          as: "sales",
+          attributes: ["id", "total_amount", "status", "created_at"],
+        },
+      ],
+    });
+    
+    return res.json({
+      success: true,
+      data: rows,
+      pagination: {
+
+
+
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        pages: Math.ceil(count / limitNum),
+      },
+    });
   } catch (error) {
     console.error("Get shifts error:", error);
     return res.status(500).json({
@@ -107,11 +177,10 @@ export const getAllShifts = async (req, res) => {
     });
   }
 };
-
 /* ================= CLOSE SHIFT ================= */
 export const closeShift = async (req, res) => {
   try {
-    const { shiftId, closingBalance } = req.body;
+    const { shiftId, closingBalance ,closing_note } = req.body;
 
     const shift = await Shift.findByPk(shiftId);
     if (!shift) {
@@ -133,6 +202,7 @@ export const closeShift = async (req, res) => {
     shift.closing_balance = closingBalance;
     shift.closed_at = new Date();
     shift.status = "CLOSED";
+    shift.closing_note = closing_note;
     shift.total_sales = totalSales || 0;
     shift.expected_balance = expectedBalance;
     shift.difference = difference;

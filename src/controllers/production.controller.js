@@ -359,3 +359,46 @@ export const abortProduction = async (req, res, next) => {
     next(error);
   }
 };
+
+// getting the weekily production log
+
+
+export const getRecentApprovedProductions = async (req, res) => {
+  try {
+    // Calculate date range: today minus 7 days
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+   const productions = await Production.findAll({
+  where: {
+    status: "APPROVED",
+    created_at: { [Op.gte]: sevenDaysAgo },
+  },
+  include: [
+    {
+      model: ProductionItem,
+      as: "items",
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "product_type"],
+          where: { product_type: "Consumable" },
+        },
+      ],
+    },
+  ],
+  order: [["created_at", "DESC"]],
+});
+
+    console.log("Productions weekly:", productions);
+    return res.json({ success: true, data: productions });
+  } catch (error) {
+    console.error("Error fetching productions:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch production logs",
+      error: error.message,
+    });
+  }
+};

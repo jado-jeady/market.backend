@@ -1,9 +1,11 @@
 import db from '../models/index.js';
+
 import { validationResult } from 'express-validator';
 import { getProductById } from './product.controller.js';
 
 
-const { Sale, SaleItem, Product, User } = db;
+
+const { Sale, SaleItem, Product,Shift, User } = db;
 import { Sequelize,Op } from 'sequelize';
 
 export const createSale = async (req, res, next) => {
@@ -178,6 +180,9 @@ export const createSale = async (req, res, next) => {
   }
 };
 
+
+
+
 export const getAllSales = async (req, res, next) => {
   try {
     let {
@@ -185,10 +190,10 @@ export const getAllSales = async (req, res, next) => {
       limit,
       start_date,
       end_date,
-      user_id,
-      payment_method,
       cashier_id,
-      status
+      payment_method,
+      status,
+      shift_id,
     } = req.query;
 
     const pageNum = Number(page) || 1;
@@ -197,43 +202,59 @@ export const getAllSales = async (req, res, next) => {
 
     const where = {};
 
-    /* Date filter */
+    /* Date filter (normalize to full day range) */
     if (start_date || end_date) {
       where.created_at = {};
-      if (start_date) where.created_at[Op.gte] = new Date(start_date);
-      if (end_date) where.created_at[Op.lte] = new Date(end_date);
+      if (start_date) {
+        where.created_at[Op.gte] = new Date(`${start_date}T00:00:00`);
+      }
+      if (end_date) {
+        where.created_at[Op.lte] = new Date(`${end_date}T23:59:59`);
+      }
     }
 
     /* Cashier filter */
-    
+    if (cashier_id) {
+      where.user_id = cashier_id;
+    }
 
-    /* Payment method */
+    /* Payment method filter */
     if (payment_method) {
       where.payment_method = payment_method;
     }
 
-    /* Status */
+    /* Status filter */
     if (status) {
       where.status = status;
+    }
+
+    /* Shift filter */
+    if (shift_id) {
+      where.shift_id = shift_id;
     }
 
     const { count, rows } = await Sale.findAndCountAll({
       where,
       limit: limitNum,
       offset,
-      order: [['created_at', 'DESC']],
+      order: [["created_at", "DESC"]],
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'full_name']
+          as: "user",
+          attributes: ["id", "full_name"],
         },
         {
           model: SaleItem,
-          as: 'items',
-          include: [{ model: Product, as: 'product' }]
-        }
-      ]
+          as: "items",
+          include: [{ model: Product, as: "product" }],
+        },
+        {
+          model: Shift,
+          as: "shift",
+          attributes: ["id", "business_date", "status"],
+        },
+      ],
     });
 
     res.json({
@@ -243,12 +264,54 @@ export const getAllSales = async (req, res, next) => {
         total: count,
         page: pageNum,
         limit: limitNum,
-        pages: Math.ceil(count / limitNum)
-      }
+        pages: Math.ceil(count / limitNum),
+      },
     });
   } catch (error) {
-    console.error(error);
+    console.error("GetAllSales error:", error);
     next(error);
+  }
+};
+
+export const getSalesByShift = async (req, res) => {
+  try {
+    const { cashierId, businessDate } = req.query;
+
+    const where = {};
+    if (cashierId) where.user_id = cashierId;
+
+    const include = [
+      {
+        model: User,
+        as: "user",
+        attributes: ["id", "full_name", "username"],
+      },
+      {
+        model: Shift,
+        as: "shift",
+        attributes: ["id", "business_date", "opened_at", "closed_at"],
+        where: businessDate ? { business_date: businessDate } : undefined,
+      },
+      {
+        model: SaleItem,
+        as: "items",
+        include: [{ model: Product, as: "product", attributes: ["id", "name"] }],
+      },
+    ];
+
+    const sales = await Sale.findAll({
+      where,
+      include,
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.json({ success: true, data: sales });
+  } catch (error) {
+    console.error("Get sales by shift error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch sales by shift",
+    });
   }
 };
 

@@ -8,7 +8,8 @@ import {
   getRejectedProductions,
   abortProduction,
   getAllProductions,
-  getProductionReport
+  getProductionReport,
+  getRecentApprovedProductions
 } from '../controllers/production.controller.js';
 
 const router = express.Router();
@@ -22,6 +23,8 @@ router.patch('/production/:id/approve', authenticate, approveProduction);
 router.patch('/production/:id/reject', authenticate, rejectProduction);
 router.get('/production/approved', authenticate, getApprovedProductions);
 router.delete("/production/:id", authenticate, abortProduction);
+router.get("/production/weekly-approved",authenticate, getRecentApprovedProductions);
+
 
 
 router.get('/production/rejected', authenticate, getRejectedProductions);

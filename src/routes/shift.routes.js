@@ -7,7 +7,7 @@ import {
   getAllShifts,
 } from "../controllers/shift.controller.js";
 
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
