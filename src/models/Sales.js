@@ -26,7 +26,7 @@ Sale.init(
 
     shift_id: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
       references: {
         model: "shifts",
         key: "id",

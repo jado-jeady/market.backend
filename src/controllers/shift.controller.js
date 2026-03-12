@@ -1,5 +1,5 @@
 import db from "../models/index.js";
-import { Op } from "sequelize";
+import { Op, where } from "sequelize";
 
 const { Shift, Sale, User } = db;
 
@@ -269,3 +269,57 @@ export const isShiftOpen = async (req, res) => {
     });
   }
 }
+
+// get a shift_id by shift bussines_date
+export const getShiftIdByBusinessDate = async (req, res) => {
+  try {
+    const { business_date } = req.params;
+    
+    const shift = await Shift.findOne({ 
+      where: { business_date },
+      attributes: ['id'] // Only selects the 'id' column
+    });
+
+    if (!shift) {
+      return res.status(404).json({
+        success: false,
+        message: "No shift found for this date",
+      });
+    }
+
+    return res.json({
+      success: true, 
+      data: shift.id // Returns only the ID value
+    });
+  } catch (error) {
+    console.error("Check shift error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to check shift",
+    });
+  }
+};
+
+// get all shift's bussiness dates
+export const getAllshiftsBussinessDates = async (req, res) => {
+  try {
+
+    const bussiness_dates = await Shift.findAll({ attributes: ['business_date']});
+    if (!bussiness_dates) {
+      return res.status(404).json({
+        success: false,
+        message: "No shift found",
+      });
+    }
+    return res.json({
+      success: true, 
+      data: bussiness_dates
+    });
+  } catch (error) {
+    console.error("Get shifts error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch shifts",
+    });
+  }
+};

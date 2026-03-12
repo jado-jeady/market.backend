@@ -19,6 +19,46 @@ export const getAllUsers = async (req, res, next) => {
   }
 };
 
+// get userName by Id
+export const getUserNameById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Using attributes: ['username'] is faster than excluding one field
+    const user = await User.findByPk(id, {
+      attributes: ['full_name']
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user // Returns just the string
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const getUserName = async (req, res, next) => {
+  User.findAll()
+    .then((users) => {
+      res.json({
+        success: true,
+        data: users
+      });
+    })
+    .catch((error) => {
+      next(error);
+    })
+}
 
 export const getUserById = async (req, res, next) => {
   try {

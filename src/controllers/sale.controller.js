@@ -7,6 +7,7 @@ import { getProductById } from './product.controller.js';
 
 const { Sale, SaleItem, Product,Shift, User } = db;
 import { Sequelize,Op } from 'sequelize';
+import sequelize from '../config/database.js';
 
 export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
@@ -197,7 +198,7 @@ export const getAllSales = async (req, res, next) => {
     } = req.query;
 
     const pageNum = Number(page) || 1;
-    const limitNum = Number(limit) || 30;
+    const limitNum = Number(limit) || 3000;
     const offset = (pageNum - 1) * limitNum;
 
     const where = {};
@@ -273,47 +274,6 @@ export const getAllSales = async (req, res, next) => {
   }
 };
 
-export const getSalesByShift = async (req, res) => {
-  try {
-    const { cashierId, businessDate } = req.query;
-
-    const where = {};
-    if (cashierId) where.user_id = cashierId;
-
-    const include = [
-      {
-        model: User,
-        as: "user",
-        attributes: ["id", "full_name", "username"],
-      },
-      {
-        model: Shift,
-        as: "shift",
-        attributes: ["id", "business_date", "opened_at", "closed_at"],
-        where: businessDate ? { business_date: businessDate } : undefined,
-      },
-      {
-        model: SaleItem,
-        as: "items",
-        include: [{ model: Product, as: "product", attributes: ["id", "name"] }],
-      },
-    ];
-
-    const sales = await Sale.findAll({
-      where,
-      include,
-      order: [["created_at", "DESC"]],
-    });
-
-    return res.json({ success: true, data: sales });
-  } catch (error) {
-    console.error("Get sales by shift error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch sales by shift",
-    });
-  }
-};
 
 
 export const getMySales = async (req, res, next) => {
@@ -440,6 +400,7 @@ export const getSaleById = async (req, res, next) => {
   }
 };
 
+// getting sales summary
 export const getSalesSummary = async (req, res, next) => {
   try {
     const today = new Date();
@@ -496,6 +457,46 @@ export const getSalesSummary = async (req, res, next) => {
         low_stock_products: lowStockProducts
       }
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+//geting sales by shift_id
+export const getSalesByShiftId = async (req, res, next) => {
+  try {
+    const { business_date } = req.params;
+
+    const sales = await Sale.findAll({
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('subtotal')), 'total_sales'],
+        [sequelize.fn('COUNT', sequelize.col('subtotal')), 'transaction_count'],
+      ],
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'full_name'],
+          required: true // Forces INNER JOIN
+        },
+        {
+          model: Shift,
+          as: 'shift', // Alias must match your association
+          attributes: [], // Don't fetch shift columns, just filter by them
+          where: { business_date },
+          required: true // This filters Sales by Shift date automatically
+        }
+      ],
+      group: ['user.id', 'Sale.user_id'],
+      subQuery: false // Important for performance with LIMIT/GROUP BY
+    });
+
+    if (!sales.length) {
+      return res.status(404).json({ success: false, message: "No sales found" });
+    }
+
+    return res.json({ success: true, data: sales });
   } catch (error) {
     next(error);
   }

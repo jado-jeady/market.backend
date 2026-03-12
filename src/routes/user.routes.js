@@ -3,6 +3,7 @@ import {
   getAllUsers,
   getUserById,
   getCashiers,
+  getUserNameById,
   updateUser,
   deleteUser,
   toggleUserStatus
@@ -19,6 +20,7 @@ router.use(authorize('Admin'));
 
 router.get('/', getAllUsers);
 router.get('/:id', getUserById);
+router.get('/username/:id', getUserNameById);
 router.get('/cashiers', getCashiers);
 router.put('/:id', updateUser);
 router.patch('/delete/:id', deleteUser);

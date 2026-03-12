@@ -1,0 +1,14 @@
+# Node.js image
+FROM  
+
+WORKDIR /app
+
+COPY . .
+
+ENV HOST=::
+ENV PORT=3000
+
+ARG VERSION  
+
+EXPOSE 3000 
+ENTRYPOINT ["./bin"]

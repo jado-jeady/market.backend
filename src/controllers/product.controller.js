@@ -10,13 +10,14 @@ const { Product, Category, SaleItem } = db;
 export const getAllProducts = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.max(1, parseInt(req.query.limit) || 50);
+    const limit = Math.max(1, parseInt(req.query.limit) || 10000);
     const offset = (page - 1) * limit;
 
     const {
       search,
       category_id,
       low_stock,
+      out_of_stock,
       product_type,
       is_active
     } = req.query;
@@ -45,6 +46,13 @@ export const getAllProducts = async (req, res, next) => {
     if (low_stock === 'true') {
       where.stock_quantity = {
         [Op.lte]: Product.sequelize.col('min_stock')
+      };
+    }
+
+    //out of stock
+    if (out_of_stock === 'true') {
+      where.stock_quantity = {
+        [Op.lte]: 0
       };
     }
 

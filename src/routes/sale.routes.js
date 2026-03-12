@@ -4,7 +4,8 @@ import {
   getAllSales,
   getMySales,
   getSaleById,
-  getSalesByShift,
+  getSalesByShiftId,
+
   getSalesSummary
 } from '../controllers/sale.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
@@ -21,8 +22,10 @@ router.get('/summary', getSalesSummary);
 // CASHIER can create sales and view their own sales
 router.post('/', authorize('Cashier', 'Admin'), saleValidation, createSale);
 router.get('/my-sales', getAllSales); // Will filter by current user
+router.get('/sales-by-shift/:business_date', getSalesByShiftId); // Will filter by current bussiness_date to get shift_id then find all sales by shift_id 
+
 router.get('/my-sale', authenticate, getMySales); // New route for cashiers to view their own sales
-router.get('/today-sales',authenticate, getSalesByShift);
+
 
 // ADMIN can view all sales
 router.get('/', authorize('Admin'), getAllSales);

@@ -5,6 +5,7 @@ import {
   getCurrentShift,
   abortShift,
   getAllShifts,
+  getAllshiftsBussinessDates,
 } from "../controllers/shift.controller.js";
 
 import { authenticate } from '../middleware/auth.middleware.js';
@@ -16,6 +17,7 @@ router.get("/current", authenticate, getCurrentShift);
 router.get("/", authenticate, getAllShifts);
 router.post("/close", authenticate, closeShift);
 router.delete("/abort", authenticate, abortShift);
+router.get("/business-date", authenticate, getAllshiftsBussinessDates);
 
 
 export default router;
