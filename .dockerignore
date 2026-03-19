@@ -41,3 +41,7 @@ build/
 .cache/
 temp/
 tmp/
+node_modules
+npm-debug.log
+.git
+.env

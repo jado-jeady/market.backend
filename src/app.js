@@ -16,26 +16,48 @@ dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// --- FIXED CORS CONFIGURATION ---
+const allowedOrigins = [
+  'https://marketfrontend.vercel.app',
+  'https://market-frontend-olive.vercel.app',
+  'http://localhost:3000', // For local development
+  'http://localhost:5173'  // For Vite development
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+// --------------------------------
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
+// Database connection 
+// Note: You have sync here AND in main.js. It's cleaner to keep it in one place.
 db.sequelize.sync({ alter: true })
   .then(() => {
-    console.log('Database synchronized');
+    console.log('✅ Database synchronized');
   })
   .catch(err => {
-    console.error('Database synchronization error:', err);
+    console.error('❌ Database synchronization error:', err);
   });
 
 // Routes
 app.get('/', (req, res) => {
   res.json({
     message: 'Welcome to Supermarket Management System API',
-    version: '1.0.0',
-    documentation: '/api-docs' // You can add Swagger later
+    version: '1.0.0'
   });
 });
 
@@ -45,7 +67,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/stock', stockRoutes);
-app.use('/api/storekeeper',storekeeperRoutes);
+app.use('/api/storekeeper', storekeeperRoutes);
 app.use('/api/shift', ShiftRoutes);
 
 // 404 handler

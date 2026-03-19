@@ -1,5 +1,5 @@
 import db from '../models/index.js';
-import { Op } from 'sequelize';
+import { Op, where } from 'sequelize';
 import { validationResult } from 'express-validator';
 
 const { Product, Category, SaleItem } = db;
@@ -287,6 +287,7 @@ export const deleteProduct = async (req, res, next) => {
 /* =====================================================
    GET PRODUCT BY BARCODE (POS SAFE)
 ===================================================== */
+
 export const getProductByBarcode = async (req, res, next) => {
   try {
     const product = await Product.findOne({
@@ -329,4 +330,23 @@ export const getProductByBarcode = async (req, res, next) => {
 };
 
 
-// for production controllers
+// get consumables 
+
+export const getAllConsumables = async( req,res, next)=>{
+  try {
+    const [count, rows]= await product.findAndCountAll({
+      where: { is_active : true, product_type : 'Consumables' }
+    })
+    return res.status(200).json({
+      data: rows,
+      count: count,
+      status: true,
+      message: 'success'
+    })
+
+  } catch (error) {
+    console.log('helper',error.message)
+    
+  }
+
+}

@@ -5,21 +5,16 @@
 app_name = "marketpos"
 
 app {
+  port = 8080
+  primary_region = "kgl" 
 
-  env = {}
-
-  port = 3000
-
-  primary_region = "kgl"
 
   compute {
     cpu      = 1
-    memory   = 256
+    memory   = 512  # Increased to 512 to avoid OOM during build
     cpu_kind = "shared"
   }
-
-  process {
-    name = "marketpos"
+  process{
+    name="marketpos"
   }
-
 }
