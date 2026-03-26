@@ -2,10 +2,9 @@ import db from "../models/index.js";
 import { Sequelize, Op } from "sequelize";
 import sequelize from "../config/database.js";
 
-const { SaleItem, Product, Return } = db;
+const { SaleItem, Product, Return, Sale } = db;
 
 /* ==================HANDLING A RETURN SALE====================*/
-
 export const createReturn = async (req, res) => {
   try {
     const { sale_id, items, requested_by } = req.body;
@@ -33,6 +32,11 @@ export const createReturn = async (req, res) => {
         }),
       ),
     );
+
+    // Update sale status to PENDING if at least one return was created
+    if (returnRequests.length > 0) {
+      await Sale.update({ status: "PENDING" }, { where: { id: sale_id } });
+    }
 
     res.json(returnRequests);
   } catch (err) {

@@ -113,12 +113,6 @@ Sale.belongsTo(Shift, { foreignKey: "shift_id", as: "shift" });
 User.hasMany(Shift, { foreignKey: "user_id", as: "shifts" });
 Shift.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
-// index.js (model loader)
-import Return from "./Return.js";
-import Sale from "./Sale.js";
-import Product from "./Product.js";
-import User from "./User.js";
-
 // After initializing all models:
 Sale.hasMany(Return, { foreignKey: "sale_id" });
 Return.belongsTo(Sale, { foreignKey: "sale_id" });

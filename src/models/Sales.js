@@ -50,7 +50,7 @@ Sale.init(
     },
 
     status: {
-      type: DataTypes.ENUM("COMPLETED", "CANCELLED", "REFUNDED"),
+      type: DataTypes.ENUM("COMPLETED", "CANCELLED", "PENDING", "REFUNDED"),
       defaultValue: "COMPLETED",
     },
 
@@ -77,8 +77,7 @@ Sale.init(
     underscored: true,
     createdAt: "created_at",
     updatedAt: false,
-  }
+  },
 );
-
 
 export default Sale;
