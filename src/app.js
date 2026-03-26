@@ -20,8 +20,9 @@ const app = express();
 const allowedOrigins = [
   'https://marketfrontend.vercel.app',
   'https://market-frontend-olive.vercel.app',
-  'http://localhost:3000', // For local development
-  'http://localhost:5173'  // For Vite development
+  'http://localhost:8080', // For local development
+  'http://localhost:3000',  // For Vite development
+  'http://192.168.0.5:3000',  // For Vite development
 ];
 
 app.use(cors({
@@ -56,8 +57,11 @@ db.sequelize.sync({ alter: true })
 // Routes
 app.get('/', (req, res) => {
   res.json({
+    success: true,
+    status:  `active`,
     message: 'Welcome to Supermarket Management System API',
-    version: '1.0.0'
+    version: '1.0.0',
+    documentation:`View the documentation here ${'http://localhost/api/documentation'} `
   });
 });
 
@@ -74,7 +78,9 @@ app.use('/api/shift', ShiftRoutes);
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: `Cannot ${req.method} ${req.url}`
+    status:  `inactive`,
+    message: `Cannot ${req.method} ${req.url}`,
+    waring:  `conntact the admin via 0782228575 for more information or read this documentation http:localhost:3000/api/documentation`
   });
 });
 

@@ -4,15 +4,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const PORT = process.env.PORT || 8080;
-// Using '0.0.0.0' is generally more compatible for cloud deployments like Render/Heroku
-const HOST = process.env.HOST || '0.0.0.0';
+
+let PORT = process.env.PORT || '8080';
+let HOST = process.env.HOST || '::';
+
+if( 'development' === process.env.NODE_ENV ) {
+   PORT = 8080;
+   HOST = '0.0.0.0';
+}
 
 /**
  * 1. Start the server first
  * This ensures the hosting platform (Render/Vercel) detects the open port 
  * immediately, preventing "Port scan timeout" errors.
  */
+console.log(`Loading the environment with this config: ${process.env.NODE_ENV} port ${PORT} host ${HOST} ...`);
 const server = app.listen(PORT, HOST, () => {
   console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
   

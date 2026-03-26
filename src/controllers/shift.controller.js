@@ -9,7 +9,7 @@ export const openShift = async (req, res) => {
     const { opening_balance, start_time, end_time, opening_note } = req.body;
     console.log("this is the body", req.body);
     const cashier_id = req.user.id;
-    const shop_name = 'Tygamarket';
+    const shop_name = "Tygamarket";
 
     // Check if ANY shift in this shop is still open
     const activeShift = await Shift.findOne({
@@ -23,7 +23,7 @@ export const openShift = async (req, res) => {
     }
 
     // Derive business_date from start_time (always use the starting day)
-    const businessDate = new Date(start_time).toISOString().split('T')[0];
+    const businessDate = new Date(start_time).toISOString().split("T")[0];
     console.log("This is the bussine date", businessDate);
 
     // Check if this cashier already had a shift for this business date
@@ -40,7 +40,6 @@ export const openShift = async (req, res) => {
       });
     }
 
-    
     // Create new shift
     const shift = await Shift.create({
       cashier_id,
@@ -76,7 +75,9 @@ export const getCurrentShift = async (req, res) => {
     });
 
     if (!shift) {
-      return res.status(404).json({ success: false, message: "Shift not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
     }
 
     return res.json({ success: true, isShiftOpen: true, data: shift });
@@ -91,19 +92,10 @@ export const getCurrentShift = async (req, res) => {
 
 /* ================= GET ALL SHIFTS ================= */
 
-
 export const getAllShifts = async (req, res) => {
   try {
-    let {
-      page,
-      limit,
-      start_date,
-      end_date,
-      cashier_id,
-      status,
-      shop_name,
-    } = req.query;
-
+    let { page, limit, start_date, end_date, cashier_id, status, shop_name } =
+      req.query;
 
     const pageNum = Number(page) || 1;
     const limitNum = Number(limit) || 30;
@@ -155,14 +147,11 @@ export const getAllShifts = async (req, res) => {
         },
       ],
     });
-    
+
     return res.json({
       success: true,
       data: rows,
       pagination: {
-
-
-
         total: count,
         page: pageNum,
         limit: limitNum,
@@ -180,14 +169,24 @@ export const getAllShifts = async (req, res) => {
 /* ================= CLOSE SHIFT ================= */
 export const closeShift = async (req, res) => {
   try {
-    const { shiftId, closingBalance ,closing_note } = req.body;
-
+    const {
+      shiftId,
+      closingBalance,
+      consumables_snapshot,
+      closing_note,
+      closed_by,
+    } = req.body;
+    console.log(`this is the closed by ${closed_by}`);
     const shift = await Shift.findByPk(shiftId);
     if (!shift) {
-      return res.status(404).json({ success: false, message: "Shift not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
     }
     if (shift.status === "CLOSED") {
-      return res.status(400).json({ success: false, message: "Shift is already closed" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Shift is already closed" });
     }
 
     // Calculate total sales for this shift
@@ -195,7 +194,8 @@ export const closeShift = async (req, res) => {
       where: { shift_id: shiftId, status: "COMPLETED" },
     });
 
-    const expectedBalance = Number(shift.opening_balance) + Number(totalSales || 0);
+    const expectedBalance =
+      Number(shift.opening_balance) + Number(totalSales || 0);
     const difference = Number(closingBalance) - expectedBalance;
 
     // Update fields
@@ -206,6 +206,8 @@ export const closeShift = async (req, res) => {
     shift.total_sales = totalSales || 0;
     shift.expected_balance = expectedBalance;
     shift.difference = difference;
+    shift.closed_by = closed_by;
+    shift.consumables_snapshot = consumables_snapshot;
 
     await shift.save();
 
@@ -230,10 +232,14 @@ export const abortShift = async (req, res) => {
     const shift = await Shift.findByPk(shiftId);
 
     if (!shift) {
-      return res.status(404).json({ success: false, message: "Shift not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Shift not found" });
     }
     if (shift.status !== "OPEN") {
-      return res.status(400).json({ success: false, message: "Only open shifts can be aborted" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Only open shifts can be aborted" });
     }
 
     // Delete all sales linked to this shift
@@ -259,7 +265,9 @@ export const abortShift = async (req, res) => {
 export const isShiftOpen = async (req, res) => {
   try {
     const cashier_id = req.user.id;
-    const shift = await Shift.findOne({ where: { cashier_id, status: "OPEN" } });
+    const shift = await Shift.findOne({
+      where: { cashier_id, status: "OPEN" },
+    });
     return res.json({ success: true, data: shift });
   } catch (error) {
     console.error("Check shift error:", error);
@@ -268,16 +276,16 @@ export const isShiftOpen = async (req, res) => {
       message: "Failed to check shift",
     });
   }
-}
+};
 
 // get a shift_id by shift bussines_date
 export const getShiftIdByBusinessDate = async (req, res) => {
   try {
     const { business_date } = req.params;
-    
-    const shift = await Shift.findOne({ 
+
+    const shift = await Shift.findOne({
       where: { business_date },
-      attributes: ['id'] // Only selects the 'id' column
+      attributes: ["id"], // Only selects the 'id' column
     });
 
     if (!shift) {
@@ -288,8 +296,8 @@ export const getShiftIdByBusinessDate = async (req, res) => {
     }
 
     return res.json({
-      success: true, 
-      data: shift.id // Returns only the ID value
+      success: true,
+      data: shift.id, // Returns only the ID value
     });
   } catch (error) {
     console.error("Check shift error:", error);
@@ -303,8 +311,9 @@ export const getShiftIdByBusinessDate = async (req, res) => {
 // get all shift's bussiness dates
 export const getAllshiftsBussinessDates = async (req, res) => {
   try {
-
-    const bussiness_dates = await Shift.findAll({ attributes: ['business_date']});
+    const bussiness_dates = await Shift.findAll({
+      attributes: ["business_date"],
+    });
     if (!bussiness_dates) {
       return res.status(404).json({
         success: false,
@@ -312,8 +321,8 @@ export const getAllshiftsBussinessDates = async (req, res) => {
       });
     }
     return res.json({
-      success: true, 
-      data: bussiness_dates
+      success: true,
+      data: bussiness_dates,
     });
   } catch (error) {
     console.error("Get shifts error:", error);

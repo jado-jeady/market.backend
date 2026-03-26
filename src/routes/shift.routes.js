@@ -8,7 +8,7 @@ import {
   getAllshiftsBussinessDates,
 } from "../controllers/shift.controller.js";
 
-import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -18,6 +18,5 @@ router.get("/", authenticate, getAllShifts);
 router.post("/close", authenticate, closeShift);
 router.delete("/abort", authenticate, abortShift);
 router.get("/business-date", authenticate, getAllshiftsBussinessDates);
-
 
 export default router;

@@ -1,45 +1,40 @@
-import db from '../models/index.js';
+import db from "../models/index.js";
 
-import { validationResult } from 'express-validator';
-import { getProductById } from './product.controller.js';
+import { validationResult } from "express-validator";
+import { getProductById } from "./product.controller.js";
 
-
-
-const { Sale, SaleItem, Product,Shift, User } = db;
-import { Sequelize,Op } from 'sequelize';
-import sequelize from '../config/database.js';
+const { Sale, SaleItem, Product, Shift, User } = db;
+import { Sequelize, Op } from "sequelize";
+import sequelize from "../config/database.js";
 
 export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
     const errors = validationResult(req.body);
-    
+
     if (!errors.isEmpty()) {
-      
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
-    
-
 
     const { items, payment_method, customer_id } = req.body;
     const userId = req.user.id;
-    
+
     // Generate invoice number (YYYYMMDD-XXXXX)
     const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "");
     const lastSale = await Sale.findOne({
       where: {
         invoice_number: {
-          [Sequelize.Op.like]: `${dateStr}-%`
-        }
+          [Sequelize.Op.like]: `${dateStr}-%`,
+        },
       },
-      order: [['invoice_number', 'DESC']],
-      transaction
+      order: [["invoice_number", "DESC"]],
+      transaction,
     });
 
     let sequence = 1;
@@ -48,7 +43,7 @@ export const createSale = async (req, res, next) => {
       sequence = lastSeq + 1;
     }
 
-    const invoiceNumber = `${dateStr}-${sequence.toString().padStart(5, '0')}`;
+    const invoiceNumber = `${dateStr}-${sequence.toString().padStart(5, "0")}`;
 
     // Validate and process items
     let subtotal = 0;
@@ -57,12 +52,12 @@ export const createSale = async (req, res, next) => {
 
     for (const item of items) {
       const product = await Product.findByPk(item.product_id, { transaction });
-      
+
       if (!product) {
         await transaction.rollback();
         return res.status(404).json({
           success: false,
-          message: `Product with ID ${item.product_id} not found`
+          message: `Product with ID ${item.product_id} not found`,
         });
       }
 
@@ -70,7 +65,7 @@ export const createSale = async (req, res, next) => {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for ${product.name}. Available: ${product.stock_quantity}`
+          message: `Insufficient stock for ${product.name}. Available: ${product.stock_quantity}`,
         });
       }
 
@@ -78,17 +73,17 @@ export const createSale = async (req, res, next) => {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
-          message: `Product ${product.name} is not active`
+          message: `Product ${product.name} is not active`,
         });
       }
 
       // Calculate item totals
       const unitPrice = product.selling_price;
       const totalPrice = unitPrice * item.quantity;
-      
+
       // Calculate VAT based on product VAT category
       let vatAmount = 0;
-      if (product.vat_category === 'STANDARD') {
+      if (product.vat_category === "STANDARD") {
         // Assuming 18% VAT (you can make this configurable)
         vatAmount = totalPrice * 0.18;
       }
@@ -103,16 +98,15 @@ export const createSale = async (req, res, next) => {
         product_name: product.name,
         barcode: product.barcode,
         vat_amount: vatAmount,
-        total_price: totalPrice
-        
+        total_price: totalPrice,
       });
 
       // Update product stock
       await product.update(
         {
-          stock_quantity: product.stock_quantity - item.quantity
+          stock_quantity: product.stock_quantity - item.quantity,
         },
-        { transaction }
+        { transaction },
       );
     }
 
@@ -131,15 +125,15 @@ export const createSale = async (req, res, next) => {
         vat_total: vatTotal,
         total_amount: totalAmount,
         payment_method,
-        status: 'COMPLETED',
+        status: "COMPLETED",
       },
-      { transaction }
+      { transaction },
     );
 
     // Create sale items
-    const saleItemsWithSaleId = saleItems.map(item => ({
+    const saleItemsWithSaleId = saleItems.map((item) => ({
       ...item,
-      sale_id: sale.id
+      sale_id: sale.id,
     }));
 
     await SaleItem.bulkCreate(saleItemsWithSaleId, { transaction });
@@ -147,42 +141,38 @@ export const createSale = async (req, res, next) => {
     // Commit transaction
     await transaction.commit();
 
-    
     // Get sale with details
     const saleWithDetails = await Sale.findByPk(sale.id, {
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'full_name', 'username']
+          as: "user",
+          attributes: ["id", "full_name", "username"],
         },
         {
           model: SaleItem,
-          as: 'items',
+          as: "items",
           include: [
             {
               model: Product,
-              as: 'product',
-              attributes: ['id', 'name', 'barcode', 'vat_category']
-            }
-          ]
-        }
-      ]
+              as: "product",
+              attributes: ["id", "name", "barcode", "vat_category"],
+            },
+          ],
+        },
+      ],
     });
 
     res.status(201).json({
       success: true,
-      message: 'Sale completed successfully',
-      data: saleWithDetails
+      message: "Sale completed successfully",
+      data: saleWithDetails,
     });
   } catch (error) {
     await transaction.rollback();
     next(error);
   }
 };
-
-
-
 
 export const getAllSales = async (req, res, next) => {
   try {
@@ -274,8 +264,6 @@ export const getAllSales = async (req, res, next) => {
   }
 };
 
-
-
 export const getMySales = async (req, res, next) => {
   try {
     let { page, limit, start_date, end_date, payment_method, status } =
@@ -289,7 +277,7 @@ export const getMySales = async (req, res, next) => {
     const cashierId = req.user.id;
 
     const where = {
-      user_id: cashierId
+      user_id: cashierId,
     };
 
     console.log("Cashier ID:", cashierId);
@@ -298,11 +286,9 @@ export const getMySales = async (req, res, next) => {
     if (start_date || end_date) {
       where.created_at = {};
 
-      if (start_date)
-        where.created_at[Op.gte] = new Date(start_date);
+      if (start_date) where.created_at[Op.gte] = new Date(start_date);
 
-      if (end_date)
-        where.created_at[Op.lte] = new Date(end_date);
+      if (end_date) where.created_at[Op.lte] = new Date(end_date);
     }
 
     /* ================= PAYMENT FILTER ================= */
@@ -328,7 +314,7 @@ export const getMySales = async (req, res, next) => {
         {
           model: User,
           as: "user",
-          attributes: ["id", "full_name"]
+          attributes: ["id", "full_name"],
         },
         {
           model: SaleItem,
@@ -336,11 +322,11 @@ export const getMySales = async (req, res, next) => {
           include: [
             {
               model: Product,
-              as: "product"
-            }
-          ]
-        }
-      ]
+              as: "product",
+            },
+          ],
+        },
+      ],
     });
 
     res.json({
@@ -350,8 +336,8 @@ export const getMySales = async (req, res, next) => {
         total: count,
         page: pageNum,
         limit: limitNum,
-        pages: Math.ceil(count / limitNum)
-      }
+        pages: Math.ceil(count / limitNum),
+      },
     });
   } catch (error) {
     console.error("Get my sales error:", error);
@@ -367,33 +353,33 @@ export const getSaleById = async (req, res, next) => {
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'full_name', 'username']
+          as: "user",
+          attributes: ["id", "full_name", "username"],
         },
         {
           model: SaleItem,
-          as: 'items',
+          as: "items",
           include: [
             {
               model: Product,
-              as: 'product',
-              attributes: ['id', 'name', 'barcode', 'vat_category']
-            }
-          ]
-        }
-      ]
+              as: "product",
+              attributes: ["id", "name", "barcode", "vat_category"],
+            },
+          ],
+        },
+      ],
     });
 
     if (!sale) {
       return res.status(404).json({
         success: false,
-        message: 'Sale not found'
+        message: "Sale not found",
       });
     }
 
     res.json({
       success: true,
-      data: sale
+      data: sale,
     });
   } catch (error) {
     next(error);
@@ -410,43 +396,43 @@ export const getSalesSummary = async (req, res, next) => {
     const todaySales = await Sale.findAll({
       where: {
         created_at: {
-          [Sequelize.Op.gte]: today
+          [Sequelize.Op.gte]: today,
         },
-        status: 'COMPLETED'
+        status: "COMPLETED",
       },
       attributes: [
-        [Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total_sales'],
-        [Sequelize.fn('COUNT', Sequelize.col('id')), 'transaction_count']
+        [Sequelize.fn("SUM", Sequelize.col("total_amount")), "total_sales"],
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "transaction_count"],
       ],
-      raw: true
+      raw: true,
     });
 
     // Sales by payment method
     const salesByPaymentMethod = await Sale.findAll({
       where: {
         created_at: {
-          [Sequelize.Op.gte]: today
+          [Sequelize.Op.gte]: today,
         },
-        status: 'COMPLETED'
+        status: "COMPLETED",
       },
       attributes: [
-        'payment_method',
-        [Sequelize.fn('SUM', Sequelize.col('total_amount')), 'total']
+        "payment_method",
+        [Sequelize.fn("SUM", Sequelize.col("total_amount")), "total"],
       ],
-      group: ['payment_method'],
-      raw: true
+      group: ["payment_method"],
+      raw: true,
     });
 
     // Low stock products
     const lowStockProducts = await Product.findAll({
       where: {
         stock_quantity: {
-          [Sequelize.Op.lte]: Sequelize.col('low_stock_threshold')
+          [Sequelize.Op.lte]: Sequelize.col("low_stock_threshold"),
         },
-        is_active: true
+        is_active: true,
       },
-      attributes: ['id', 'name', 'stock_quantity', 'low_stock_threshold'],
-      limit: 10
+      attributes: ["id", "name", "stock_quantity", "low_stock_threshold"],
+      limit: 10,
     });
 
     res.json({
@@ -454,14 +440,13 @@ export const getSalesSummary = async (req, res, next) => {
       data: {
         today_sales: todaySales[0] || { total_sales: 0, transaction_count: 0 },
         sales_by_payment_method: salesByPaymentMethod,
-        low_stock_products: lowStockProducts
-      }
+        low_stock_products: lowStockProducts,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
-
 
 //geting sales by shift_id
 export const getSalesByShiftId = async (req, res, next) => {
@@ -470,33 +455,63 @@ export const getSalesByShiftId = async (req, res, next) => {
 
     const sales = await Sale.findAll({
       attributes: [
-        [sequelize.fn('SUM', sequelize.col('subtotal')), 'total_sales'],
-        [sequelize.fn('COUNT', sequelize.col('subtotal')), 'transaction_count'],
+        [sequelize.fn("SUM", sequelize.col("subtotal")), "total_sales"],
+        [sequelize.fn("COUNT", sequelize.col("subtotal")), "transaction_count"],
       ],
       include: [
         {
           model: User,
-          as: 'user',
-          attributes: ['id', 'full_name'],
-          required: true // Forces INNER JOIN
+          as: "user",
+          attributes: ["id", "full_name"],
+          required: true, // Forces INNER JOIN
         },
         {
           model: Shift,
-          as: 'shift', // Alias must match your association
+          as: "shift", // Alias must match your association
           attributes: [], // Don't fetch shift columns, just filter by them
           where: { business_date },
-          required: true // This filters Sales by Shift date automatically
-        }
+          required: true, // This filters Sales by Shift date automatically
+        },
       ],
-      group: ['user.id', 'Sale.user_id'],
-      subQuery: false // Important for performance with LIMIT/GROUP BY
+      group: ["user.id", "Sale.user_id"],
+      subQuery: false, // Important for performance with LIMIT/GROUP BY
     });
 
     if (!sales.length) {
-      return res.status(404).json({ success: false, message: "No sales found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "No sales found" });
     }
 
     return res.json({ success: true, data: sales });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// handling a retund sale
+export const handleReturnSale = async (req, res, next) => {
+  try {
+    const { saleId } = req.params;
+
+    const sale = await Sale.findByPk(saleId);
+
+    if (!sale) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Sale not found" });
+    }
+
+    if (sale.status !== "COMPLETED") {
+      return res.status(400).json({
+        success: false,
+        message: "Only completed sales can be returned",
+      });
+    }
+
+    await sale.update({ status: "RETURNED" });
+
+    return res.json({ success: true, message: "Sale returned successfully" });
   } catch (error) {
     next(error);
   }

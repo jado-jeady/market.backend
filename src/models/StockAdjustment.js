@@ -58,8 +58,7 @@ StockAdjustment.init(
     tableName: "stock_adjustments",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
-
 
 export default StockAdjustment;

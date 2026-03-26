@@ -81,6 +81,17 @@ Shift.init(
       type: DataTypes.STRING,
       defaultValue: "Tyga_market",
     },
+    closed_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      onDelete: "CASCADE",
+    },
+    consumables_snapshot: {
+      type: DataTypes.JSONB, // Use DataTypes.JSONB if you are using PostgreSQL for better performance
+      allowNull: true,
+      comment:
+        "Stores the state of consumables (name, qty, status) at the time of closing",
+    },
   },
   {
     sequelize,
@@ -88,7 +99,7 @@ Shift.init(
     tableName: "shifts",
     timestamps: true,
     underscored: true,
-  }
+  },
 );
 
 export default Shift;
