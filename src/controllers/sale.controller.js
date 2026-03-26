@@ -1,11 +1,10 @@
 import db from "../models/index.js";
-
 import { validationResult } from "express-validator";
-import { getProductById } from "./product.controller.js";
 
-const { Sale, SaleItem, Product, Shift, User } = db;
 import { Sequelize, Op } from "sequelize";
 import sequelize from "../config/database.js";
+
+const { Sale, SaleItem, Product, Shift, User } = db;
 
 export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
@@ -484,34 +483,6 @@ export const getSalesByShiftId = async (req, res, next) => {
     }
 
     return res.json({ success: true, data: sales });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// handling a retund sale
-export const handleReturnSale = async (req, res, next) => {
-  try {
-    const { saleId } = req.params;
-
-    const sale = await Sale.findByPk(saleId);
-
-    if (!sale) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Sale not found" });
-    }
-
-    if (sale.status !== "COMPLETED") {
-      return res.status(400).json({
-        success: false,
-        message: "Only completed sales can be returned",
-      });
-    }
-
-    await sale.update({ status: "RETURNED" });
-
-    return res.json({ success: true, message: "Sale returned successfully" });
   } catch (error) {
     next(error);
   }
