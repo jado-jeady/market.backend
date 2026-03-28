@@ -113,10 +113,25 @@ Sale.belongsTo(Shift, { foreignKey: "shift_id", as: "shift" });
 User.hasMany(Shift, { foreignKey: "user_id", as: "shifts" });
 Shift.belongsTo(User, { foreignKey: "user_id", as: "user" });
 
-// After initializing all models:
+// ----------------------RETURNS Relationships ----------------
+
+// Sale ↔ SaleItem
+Sale.hasMany(SaleItem, { foreignKey: "sale_id" });
+SaleItem.belongsTo(Sale, { foreignKey: "sale_id" });
+
+// Product ↔ SaleItem
+Product.hasMany(SaleItem, { foreignKey: "product_id" });
+SaleItem.belongsTo(Product, { foreignKey: "product_id" });
+
+// Sale ↔ Return
 Sale.hasMany(Return, { foreignKey: "sale_id" });
 Return.belongsTo(Sale, { foreignKey: "sale_id" });
 
+// SaleItem ↔ Return (new link)
+SaleItem.hasMany(Return, { foreignKey: "sale_item_id" });
+Return.belongsTo(SaleItem, { foreignKey: "sale_item_id" });
+
+// Product ↔ Return (optional, since SaleItem already links to Product)
 Product.hasMany(Return, { foreignKey: "product_id" });
 Return.belongsTo(Product, { foreignKey: "product_id" });
 
@@ -125,6 +140,7 @@ User.hasMany(Return, { foreignKey: "requested_by", as: "RequestedReturns" });
 Return.belongsTo(User, { foreignKey: "requested_by", as: "Requester" });
 
 // Approved by (admin)
+
 User.hasMany(Return, { foreignKey: "approved_by", as: "ApprovedReturns" });
 Return.belongsTo(User, { foreignKey: "approved_by", as: "Approver" });
 

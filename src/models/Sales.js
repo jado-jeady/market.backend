@@ -50,7 +50,13 @@ Sale.init(
     },
 
     status: {
-      type: DataTypes.ENUM("COMPLETED", "CANCELLED", "PENDING", "REFUNDED"),
+      type: DataTypes.ENUM(
+        "COMPLETED",
+        "CANCELLED",
+        "PENDING",
+        "REFUNDED",
+        "PARTIALLY_REFUNDED",
+      ),
       defaultValue: "COMPLETED",
     },
 

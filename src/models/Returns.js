@@ -1,4 +1,4 @@
-import { DataTypes, Model } from "sequelize";
+import { Model, DataTypes } from "sequelize";
 import sequelize from "../config/database.js";
 
 class Return extends Model {}
@@ -11,6 +11,10 @@ Return.init(
       primaryKey: true,
     },
     sale_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    Sale_item_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
