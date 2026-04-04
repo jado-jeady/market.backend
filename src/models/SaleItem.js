@@ -1,5 +1,5 @@
-import { Model, DataTypes } from 'sequelize';
-import sequelize from '../config/database.js';
+import { Model, DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
 
 class SaleItem extends Model {}
 
@@ -8,53 +8,58 @@ SaleItem.init(
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true
+      autoIncrement: true,
     },
 
     sale_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: false,
     },
 
     product_id: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: false,
     },
 
     product_name: {
       type: DataTypes.STRING,
       allowNull: false,
-      comment: 'Snapshot of product name at sale time'
+      comment: "Snapshot of product name at sale time",
     },
 
     barcode: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
     },
 
     quantity: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: false,
     },
 
     unit_price: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
-      comment: 'Price at time of sale'
+      comment: "Price at time of sale",
     },
 
     total_price: {
       type: DataTypes.DECIMAL(12, 2),
-      allowNull: false
-    }
+      allowNull: false,
+    },
+    is_refunded: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+    },
   },
   {
     sequelize,
-    modelName: 'SaleItem',
-    tableName: 'sale_items',
+    modelName: "SaleItem",
+    tableName: "sale_items",
     timestamps: false,
-    underscored: true
-  }
+    underscored: true,
+  },
 );
 
 export default SaleItem;

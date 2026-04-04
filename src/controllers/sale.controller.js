@@ -318,6 +318,7 @@ export const getMySales = async (req, res, next) => {
         {
           model: SaleItem,
           as: "items",
+          where: { is_refunded: false },
           include: [
             {
               model: Product,

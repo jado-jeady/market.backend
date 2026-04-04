@@ -1,4 +1,4 @@
-import express from 'express';
+import express from "express";
 import {
   getAllUsers,
   getUserById,
@@ -6,9 +6,9 @@ import {
   getUserNameById,
   updateUser,
   deleteUser,
-  toggleUserStatus
-} from '../controllers/user.controller.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+  toggleUserStatus,
+} from "../controllers/user.controller.js";
+import { authenticate, authorize } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -16,14 +16,14 @@ const router = express.Router();
 router.use(authenticate);
 
 // Only ADMIN can access user management routes
-router.use(authorize('Admin'));
+router.use(authorize("Admin"));
 
-router.get('/', getAllUsers);
-router.get('/:id', getUserById);
-router.get('/username/:id', getUserNameById);
-router.get('/cashiers', getCashiers);
-router.put('/:id', updateUser);
-router.patch('/delete/:id', deleteUser);
-router.patch('/:id/toggle-status', toggleUserStatus);
+router.get("/", getAllUsers);
+router.get("/:id", getUserById);
+router.get("/username/:id", getUserNameById);
+router.get("/cashiers", getCashiers);
+router.put("/:id", authorize("Admin"), updateUser);
+router.patch("/delete/:id", deleteUser);
+router.patch("/:id/toggle-status", toggleUserStatus);
 
 export default router;

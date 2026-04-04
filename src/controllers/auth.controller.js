@@ -1,10 +1,10 @@
-import db from '../models/index.js';
-import { validationResult } from 'express-validator';
-import bcrypt from 'bcryptjs';
-import { Op } from 'sequelize';
+import db from "../models/index.js";
+import { validationResult } from "express-validator";
+import bcrypt from "bcryptjs";
+import { Op } from "sequelize";
 
-import User from '../models/User.js'; // Adjust path as needed
-import { generateToken } from '../utils/jwt.js'; // Adjust path as needed
+import User from "../models/User.js"; // Adjust path as needed
+import { generateToken } from "../utils/jwt.js"; // Adjust path as needed
 
 export const register = async (req, res, next) => {
   try {
@@ -13,30 +13,30 @@ export const register = async (req, res, next) => {
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
     const { full_name, username, email, password, role, shop_name } = req.body;
-    console.log(req.body.role+"this is the role");
+    console.log(req.body.role + "this is the role");
 
     // 2. Check if username or email already exists
     const existingUser = await User.findOne({
-      where: { 
-        [Op.or]: [{ username }, { email }] 
-      }
+      where: {
+        [Op.or]: [{ username }, { email }],
+      },
     });
 
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Username or Email already in use'
+        message: "Username or Email already in use",
       });
     }
 
     /**
      * FIX: Pass the plain 'password' into 'password_hash'.
-     * DO NOT use bcrypt.hash() here because your User model has a 
+     * DO NOT use bcrypt.hash() here because your User model has a
      * 'beforeCreate' hook that will hash it for you.
      */
     const user = await User.create({
@@ -44,14 +44,14 @@ export const register = async (req, res, next) => {
       username,
       email,
       password_hash: password, // The hook handles the hashing
-      role: role || 'Cashier',
-      shop_name: shop_name || 'masteryhub',
-      is_active: true
+      role: role || "Cashier",
+      shop_name: shop_name || "masteryhub",
+      is_active: true,
     });
 
     // 3. Generate Auth Token
-    
-console.log(user.role+"this is the user role");
+
+    console.log(user.role + "this is the user role");
     const token = generateToken(user);
     // 4. Prepare response (excluding sensitive data)
     const userResponse = {
@@ -61,25 +61,22 @@ console.log(user.role+"this is the user role");
       email: user.email,
       role: user.role,
       shop_name: user.shop_name,
-      is_active: user.is_active
+      is_active: user.is_active,
     };
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: "User registered successfully",
       data: {
         user: userResponse,
-        token
-      }
+        token,
+      },
     });
-
   } catch (error) {
     // Pass unexpected errors to the global error handler
     next(error);
   }
 };
-
-
 
 export const login = async (req, res, next) => {
   try {
@@ -87,32 +84,31 @@ export const login = async (req, res, next) => {
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
     const { username, password } = req.body;
 
-
     const user = await User.findOne({
-      where: { username }
+      where: { username },
     });
 
     if (!user || !user.is_active) {
       return res.status(401).json({
         success: false,
-        message: 'Account is disabled or invalid credentials'
+        message: "Account is disabled or invalid credentials",
       });
     }
-    
+
     console.log(`username before ${username} password ${password}`);
     const isValidPassword = await user.comparePassword(password);
-    console.log("compare password Out PUT:"+isValidPassword);
+    console.log("compare password Out PUT:" + isValidPassword);
 
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: "Invalid credentials",
       });
     }
 
@@ -125,43 +121,40 @@ export const login = async (req, res, next) => {
       email: user.email,
       role: user.role,
       is_active: user.is_active,
-      shop_name: user.shop_name
+      shop_name: user.shop_name,
     };
-    
+
     console.log(userResponse);
-    console.log({userResponse:userResponse})
+    console.log({ userResponse: userResponse });
     res.json({
       success: true,
-      message: 'Login successful',
+      message: "Login successful",
       data: {
         user: userResponse,
-        token
-      }
+        token,
+      },
     });
-
   } catch (error) {
     next(error);
   }
 };
 
-
-
 export const getProfile = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password_hash'] }
+      attributes: { exclude: ["password_hash"] },
     });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: "User not found",
       });
     }
 
     res.json({
       success: true,
-      data: user
+      data: user,
     });
   } catch (error) {
     next(error);
