@@ -382,4 +382,18 @@ export const bulkApproveReturns = async (req, res) => {
   }
 };
 
-// ==========================REJECTING A RETRUN--=========================
+// ========================== GETTING RETURNS BY CASHIER =============================
+export const getReturnsByCashier = async (req, res) => {
+  try {
+    const { id: cashierId } = req.params;
+    const { rows: returns, count } = await Return.findAndCountAll({
+      where: { requested_by: cashierId },
+      include: [{ model: Sale, include: [SaleItem] }],
+      distinct: true,
+    });
+    res.json({ returns, count });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch returns" });
+  }
+};

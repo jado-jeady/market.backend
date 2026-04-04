@@ -13,6 +13,7 @@ import {
   approveReturn,
   createReturn,
   getAllReturns,
+  getReturnsByCashier,
 } from "../controllers/Returns.controller.js";
 
 const router = express.Router();
@@ -32,6 +33,7 @@ router.get("/my-sale", authenticate, getMySales);
 // RETURN ROUTES
 router.post("/return", authorize("Cashier"), saleValidation, createReturn);
 router.get("/return", authorize("Admin"), getAllReturns);
+router.get("/return/:id", authenticate, getReturnsByCashier);
 router.put("/return/:id/approve", authorize("Admin"), approveReturn);
 
 // ADMIN can view all sales
