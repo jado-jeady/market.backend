@@ -201,7 +201,7 @@ export const closeShift = async (req, res) => {
     // Update fields
     shift.closing_balance = closingBalance;
     shift.closed_at = new Date();
-    shift.status = "CLOSED";
+    shift.status = closed_by === 3 ? "ABORTED" : "CLOSED";
     shift.closing_note = closing_note;
     shift.total_sales = totalSales || 0;
     shift.expected_balance = expectedBalance;
@@ -329,6 +329,32 @@ export const getAllshiftsBussinessDates = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch shifts",
+    });
+  }
+};
+
+//get last consumables saved
+export const getLastConsumables = async (req, res) => {
+  try {
+    const lastConsumables = await Shift.findOne({
+      order: [["created_at", "DESC"]],
+      attributes: ["consumables_snapshot"],
+    });
+    if (!lastConsumables) {
+      return res.status(404).json({
+        success: false,
+        message: "No consumables found",
+      });
+    }
+    return res.json({
+      success: true,
+      data: lastConsumables,
+    });
+  } catch (error) {
+    console.error("Get consumables error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch consumables",
     });
   }
 };
