@@ -31,11 +31,11 @@ const sequelize = process.env.DATABASE_URL
         port: process.env.DB_PORT,
         dialect: "postgres",
         dialectOptions: {
-          family: 6,
-        },
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
+          //family: 6, // Crucial for Andasy IPv6
+          ssl: {
+            require: true,
+            rejectUnauthorized: false,
+          },
         },
         logging: console.log,
       },
