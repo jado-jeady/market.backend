@@ -33,6 +33,10 @@ const sequelize = process.env.DATABASE_URL
         dialectOptions: {
           family: 6,
         },
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
         logging: console.log,
       },
     );
