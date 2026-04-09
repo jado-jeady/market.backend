@@ -49,14 +49,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Database connection
 // Note: You have sync here AND in main.js. It's cleaner to keep it in one place.
-db.sequelize
-  .sync({ alter: true })
-  .then(() => {
-    console.log("✅ Database synchronized");
-  })
-  .catch((err) => {
-    console.error("❌ Database synchronization error:", err);
-  });
 
 // Routes
 app.get("/", (req, res) => {

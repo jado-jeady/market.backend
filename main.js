@@ -32,6 +32,9 @@ const server = app.listen(PORT, HOST, () => {
       console.log("✅ Database connected successfully.");
     })
     .then(() => {
+      return sequelize.sync({ alter: true });
+    })
+    .then(() => {
       console.log("📦 Database models synced.");
     })
     .catch((err) => {
