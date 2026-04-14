@@ -41,7 +41,6 @@ export const createSale = async (req, res, next) => {
       const lastSeq = parseInt(lastSale.invoice_number.slice(-5));
       sequence = lastSeq + 1;
     }
-
     const invoiceNumber = `${dateStr}-${sequence.toString().padStart(5, "0")}`;
 
     // Validate and process items
@@ -303,7 +302,6 @@ export const getMySales = async (req, res, next) => {
     }
 
     /* ================= FETCH ================= */
-
     const { count, rows } = await Sale.findAndCountAll({
       where,
       limit: limitNum,
@@ -318,7 +316,6 @@ export const getMySales = async (req, res, next) => {
         {
           model: SaleItem,
           as: "items",
-          where: { is_refunded: false },
           include: [
             {
               model: Product,

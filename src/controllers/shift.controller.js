@@ -6,7 +6,8 @@ const { Shift, Sale, User } = db;
 /* ================= OPEN SHIFT ================= */
 export const openShift = async (req, res) => {
   try {
-    const { opening_balance, start_time, end_time, opening_note } = req.body;
+    const { opening_balance, start_time, end_time, opening_note, petty_cash } =
+      req.body;
     console.log("this is the body", req.body);
     const cashier_id = req.user.id;
     const shop_name = "Tygamarket";
@@ -46,6 +47,7 @@ export const openShift = async (req, res) => {
       opening_balance,
       shop_name,
       start_time,
+      petty_cash,
       end_time,
       opening_note,
       business_date: businessDate,
@@ -90,7 +92,21 @@ export const getCurrentShift = async (req, res) => {
   }
 };
 
-/* ================= GET ALL SHIFTS ================= */
+/* ================= GET ALL SHIFTS ONLY ================= */
+export const getAllOnlyShifts = async (req, res) => {
+  try {
+    const shifts = await Shift.findAll();
+    return res.json({ success: true, data: shifts });
+  } catch (error) {
+    console.error("Get all shifts error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch all shifts",
+    });
+  }
+};
+
+/* ================= GET ALL SHIFTS with sales ================= */
 
 export const getAllShifts = async (req, res) => {
   try {
@@ -171,10 +187,11 @@ export const closeShift = async (req, res) => {
   try {
     const {
       shiftId,
-      closingBalance,
+      closing_balance,
       consumables_snapshot,
       closing_note,
       closed_by,
+      cash_in_hand,
     } = req.body;
     console.log(`this is the closed by ${closed_by}`);
     const shift = await Shift.findByPk(shiftId);
@@ -191,15 +208,26 @@ export const closeShift = async (req, res) => {
 
     // Calculate total sales for this shift
     const totalSales = await Sale.sum("subtotal", {
-      where: { shift_id: shiftId, status: "COMPLETED" },
+      where: {
+        shift_id: shiftId,
+        status: {
+          [Op.in]: [
+            "COMPLETED",
+            "PENDING",
+            "PARTIALLY_PENDING",
+            "PARTIALLY_REFUNDED",
+          ],
+        },
+      },
     });
 
-    const expectedBalance =
-      Number(shift.opening_balance) + Number(totalSales || 0);
-    const difference = Number(closingBalance) - expectedBalance;
+    const expectedBalance = totalSales + Number(shift.petty_cash); // rather we will remove the expenses and peti_cash is the money the user starts with for the changes
+    const ArikuriMomo = Number(closing_balance) - Number(shift.opening_balance);
+    const available_balance = Number(ArikuriMomo) + Number(cash_in_hand);
+    const difference = expectedBalance - available_balance;
 
     // Update fields
-    shift.closing_balance = closingBalance;
+    shift.closing_balance = closing_balance;
     shift.closed_at = new Date();
     shift.status = closed_by === 3 ? "ABORTED" : "CLOSED";
     shift.closing_note = closing_note;
@@ -208,6 +236,8 @@ export const closeShift = async (req, res) => {
     shift.difference = difference;
     shift.closed_by = closed_by;
     shift.consumables_snapshot = consumables_snapshot;
+    shift.available_balance = available_balance;
+    shift.cash_in_hand = cash_in_hand;
 
     await shift.save();
 
