@@ -271,13 +271,8 @@ export const getMySales = async (req, res, next) => {
     const limitNum = Number(limit) || Number.MAX_SAFE_INTEGER;
     const offset = (pageNum - 1) * limitNum;
 
-    // ✅ Get cashier ID from token (NOT from query)
+    // Getting cashier ID from token (NOT from query) for security reason
     const cashierId = req.user.id;
-
-    console.log(
-      "=====================================Cashier ID:===================================",
-      cashierId,
-    );
 
     if (!cashierId) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -287,29 +282,20 @@ export const getMySales = async (req, res, next) => {
       user_id: cashierId,
     };
 
-    console.log("Cashier ID:", cashierId);
     /* ================= DATE FILTER ================= */
-
     if (start_date || end_date) {
       where.created_at = {};
-
       if (start_date) where.created_at[Op.gte] = new Date(start_date);
-
       if (end_date) where.created_at[Op.lte] = new Date(end_date);
     }
-
     /* ================= PAYMENT FILTER ================= */
-
     if (payment_method) {
       where.payment_method = payment_method;
     }
-
     /* ================= STATUS FILTER ================= */
-
     if (status) {
       where.status = status.toUpperCase();
     }
-
     /* ================= FETCH ================= */
     const { count, rows } = await Sale.findAndCountAll({
       where,

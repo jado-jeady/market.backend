@@ -3,18 +3,12 @@ import { verifyToken } from "../utils/jwt.js";
 export const authenticate = (req, res, next) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
-    console.log(token);
-    console.log(
-      "===========================token above=======================================",
-    );
-
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Access denied. No token provided.sdsdsd",
+        message: "Access denied. No token provided.",
       });
     }
-
     const decoded = verifyToken(token);
     req.user = decoded;
     next();
@@ -25,7 +19,7 @@ export const authenticate = (req, res, next) => {
     });
     return res.status(401).json({
       success: false,
-      message: "Invalid tokebbbbbbbn.",
+      message: "Invalid token.",
       error: error.message,
     });
   }
