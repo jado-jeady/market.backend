@@ -274,6 +274,15 @@ export const getMySales = async (req, res, next) => {
     // ✅ Get cashier ID from token (NOT from query)
     const cashierId = req.user.id;
 
+    console.log(
+      "=====================================Cashier ID:===================================",
+      cashierId,
+    );
+
+    if (!cashierId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
     const where = {
       user_id: cashierId,
     };
@@ -320,6 +329,13 @@ export const getMySales = async (req, res, next) => {
             {
               model: Product,
               as: "product",
+              attributes: [
+                "id",
+                "name",
+                "barcode",
+                "selling_price",
+                "description",
+              ],
             },
           ],
         },
