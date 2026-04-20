@@ -226,7 +226,7 @@ const updateSaleStatus = async (sale_id) => {
   } else if (hasRejected && !hasApproved) {
     sale.status = "REFUND_REJECTED";
   } else {
-    sale.status = "COMPLETED";
+    sale.status = "REFUNDED";
   }
 
   await sale.save();

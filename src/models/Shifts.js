@@ -32,6 +32,7 @@ Shift.init(
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0.0,
+      comment: "Opening momo balance at the start of the shift",
     },
     opening_note: {
       type: DataTypes.TEXT,
@@ -41,9 +42,14 @@ Shift.init(
     closing_balance: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: true,
+      comment: "Closing momo balance at the end of the shift",
     },
     closing_note: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    cash_in_hand: {
+      type: DataTypes.DECIMAL(12, 2),
       allowNull: true,
     },
 
@@ -55,6 +61,16 @@ Shift.init(
     expected_balance: {
       type: DataTypes.DECIMAL(12, 2),
       allowNull: true,
+    },
+    available_balance: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      comment: "balance that a cashier has(cash and Momo)",
+    },
+    petty_cash: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      comment: "balance that a cashier starts with",
     },
 
     difference: {

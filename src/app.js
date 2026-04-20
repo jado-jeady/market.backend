@@ -23,6 +23,7 @@ const allowedOrigins = [
   "http://localhost:8080", // For local development
   "http://localhost:3000", // For Vite development
   "http://192.168.0.5:3000", // For Vite development
+  "https://bitter-breeze-52de.rwandamasteryhub2024.workers.dev/",
 ];
 
 app.use(
