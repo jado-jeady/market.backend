@@ -448,42 +448,56 @@ export const getSalesSummary = async (req, res, next) => {
 };
 
 //geting sales by shift_id
-export const getSalesByShiftId = async (req, res, next) => {
+export const getCashierSalesByashiftDate = async (req, res, next) => {
   try {
     const { business_date } = req.params;
-
-    const sales = await Sale.findAll({
-      attributes: [
-        [sequelize.fn("SUM", sequelize.col("subtotal")), "total_sales"],
-        [sequelize.fn("COUNT", sequelize.col("subtotal")), "transaction_count"],
-      ],
-      include: [
-        {
-          model: User,
-          as: "user",
-          attributes: ["id", "full_name"],
-          required: true, // Forces INNER JOIN
-        },
-        {
-          model: Shift,
-          as: "shift", // Alias must match your association
-          attributes: [], // Don't fetch shift columns, just filter by them
-          where: { business_date },
-          required: true, // This filters Sales by Shift date automatically
-        },
-      ],
-      group: ["user.id", "Sale.user_id"],
-      subQuery: false, // Important for performance with LIMIT/GROUP BY
-    });
-
-    if (!sales.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No sales found" });
+    const cashierId = req.user.id; // Get the logged-in cashier's ID
+    // ✅ Add this check to prevent SQL errors
+    if (!business_date || business_date === "Invalid date") {
+      return res.status(400).json({
+        success: false,
+        message: "A valid business date is required.",
+      });
     }
 
-    return res.json({ success: true, data: sales });
+    const sales = await Sale.findAll({
+      where: { user_id: cashierId }, // Filter by the specific cashier
+      include: [
+        {
+          model: Shift,
+          as: "shift",
+          attributes: ["business_date"],
+          where: { business_date }, // Filter by the shift date
+          required: true,
+        },
+        {
+          model: SaleItem,
+          as: "items", // Include items to show what was sold
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["name", "barcode"],
+            },
+          ],
+        },
+      ],
+      order: [["created_at", "DESC"]], // Show latest sales first
+    });
+
+    if (!sales || sales.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No sales found for ${business_date}`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: sales,
+    });
   } catch (error) {
+    console.error("Error fetching cashier sales by date:", error);
     next(error);
   }
 };

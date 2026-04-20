@@ -224,7 +224,7 @@ export const closeShift = async (req, res) => {
     const expectedBalance = totalSales + Number(shift.petty_cash); // rather we will remove the expenses and peti_cash is the money the user starts with for the changes
     const ArikuriMomo = Number(closing_balance) - Number(shift.opening_balance);
     const available_balance = Number(ArikuriMomo) + Number(cash_in_hand);
-    const difference = expectedBalance - available_balance;
+    const difference = available_balance - expectedBalance; //if the profit is less than 0 it means we are losing money and if it is greater than 0 it means we are making profit and if it is 0 it means we are breaking even
 
     // Update fields
     shift.closing_balance = closing_balance;
