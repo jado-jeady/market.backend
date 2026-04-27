@@ -501,3 +501,5 @@ export const getCashierSalesByashiftDate = async (req, res, next) => {
     next(error);
   }
 };
+
+// getting Daiily sales

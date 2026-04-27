@@ -27,7 +27,15 @@ const sequelize = process.env.DATABASE_URL
         port: process.env.DB_PORT,
         dialect: "postgres",
         dialectOptions: {
+<<<<<<< Updated upstream
           family: 6,
+=======
+          //family: 6, // Crucial for Andasy IPv6
+          // ssl: {
+          //   require: true,
+          //   rejectUnauthorized: false,
+          // },
+>>>>>>> Stashed changes
         },
         logging: console.log,
       },

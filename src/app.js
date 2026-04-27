@@ -11,6 +11,8 @@ import { errorHandler } from "./middleware/error.middleware.js";
 import stockRoutes from "./routes/stock.routes.js";
 import ShiftRoutes from "./routes/shift.routes.js";
 import storekeeperRoutes from "./routes/storekeeper.routes.js";
+import expenseRoutes from "./routes/expense.routes.js";
+import e from "express";
 
 dotenv.config();
 
@@ -78,6 +80,7 @@ app.use("/api/sales", saleRoutes);
 app.use("/api/stock", stockRoutes);
 app.use("/api/storekeeper", storekeeperRoutes);
 app.use("/api/shift", ShiftRoutes);
+app.use("/api/expense", expenseRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -30,6 +30,7 @@ router.get("/my-sales", getAllSales);
 router.get(
   "/sales-by-shift/:business_date",
   authenticate,
+  authorize("Cashier", "Admin"),
   getCashierSalesByashiftDate,
 );
 router.get("/my-sale", authenticate, getMySales);

@@ -9,6 +9,8 @@ import Shift from "./Shifts.js";
 import Production from "./Productions.js";
 import ProductionItem from "./ProductionItems.js";
 import Return from "./Returns.js";
+import Expense from "./Expenses.js";
+import ExpenseCategory from "./ExpenseCategory.js";
 
 // Define relationships
 
@@ -156,6 +158,8 @@ const db = {
   Production,
   ProductionItem,
   Return,
+  Expense,
+  ExpenseCategory,
 };
 
 export default db;
