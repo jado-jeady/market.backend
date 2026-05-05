@@ -1,5 +1,6 @@
 import db from "../models/index.js";
 import cloudinary from "../config/cloudinary.js";
+import streamifier from "streamifier";
 
 const { Expense, ExpenseCategory } = db;
 
@@ -20,10 +21,26 @@ export const createExpense = async (req, res) => {
 
     // If a file was uploaded, push it to Cloudinary
     if (req.file) {
-      const uploaded = await cloudinary.uploader.upload(req.file.path, {
-        folder: "TygaMarket/ExpenseReceipts",
-      });
+      console.log("Uploading receipt to Cloudinary...");
+      console.log("File original name:", req.file.originalname);
+
+      // Wrap upload_stream in a Promise
+      const uploadToCloudinary = (fileBuffer) => {
+        return new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: "TygaMarket/ExpenseReceipts" },
+            (error, result) => {
+              if (error) return reject(error);
+              resolve(result);
+            },
+          );
+          streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+        });
+      };
+
+      const uploaded = await uploadToCloudinary(req.file.buffer);
       receiptUrl = uploaded.secure_url;
+      console.log("Receipt uploaded to Cloudinary:", receiptUrl);
     }
 
     const newExpense = await Expense.create({
@@ -43,6 +60,7 @@ export const createExpense = async (req, res) => {
       data: newExpense,
     });
   } catch (error) {
+    console.error({ success: false, message: error.message });
     return res.status(500).json({ success: false, message: error.message });
   }
 };
