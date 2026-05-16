@@ -1,6 +1,6 @@
 import db from "../models/index.js";
-import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import cloudinary from "../config/cloudinary.js";
 
 const { Expense, ExpenseCategory } = db;
 
@@ -27,7 +27,7 @@ export const createExpense = async (req, res) => {
       // Wrap upload_stream in a Promise
       const uploadToCloudinary = (fileBuffer) => {
         return new Promise((resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
+          const uploadStream = cloudinaryConfig.uploader.upload_stream(
             { folder: "TygaMarket/ExpenseReceipts" },
             (error, result) => {
               if (error) return reject(error);

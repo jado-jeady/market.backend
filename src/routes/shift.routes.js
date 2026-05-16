@@ -8,6 +8,7 @@ import {
   getAllshiftsBussinessDates,
   getLastConsumables,
   getAllOnlyShifts,
+  withdrawShift,
 } from "../controllers/shift.controller.js";
 
 import { authenticate } from "../middleware/auth.middleware.js";
@@ -22,5 +23,6 @@ router.get("/all", authenticate, getAllShifts);
 router.post("/close", authenticate, closeShift);
 router.delete("/abort", authenticate, abortShift);
 router.get("/business-date", authenticate, getAllshiftsBussinessDates);
+router.post("/:shiftID/withdraw", authenticate, withdrawShift);
 
 export default router;

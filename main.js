@@ -4,11 +4,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-let PORT = process.env.PORT || "8080";
+let PORT = process.env.PORT || "8888";
 let HOST = process.env.HOST || "::";
 
 if ("development" === process.env.NODE_ENV) {
-  PORT = 8080;
+  PORT = 8888;
   HOST = "0.0.0.0";
 }
 
