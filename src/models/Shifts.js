@@ -108,6 +108,16 @@ Shift.init(
       comment:
         "Stores the state of consumables (name, qty, status) at the time of closing",
     },
+    cash_withdrawal: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      comment: "Amount of cash withdrawn during the shift",
+    },
+    withdrawal_date: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: "Date when cash was withdrawn",
+    },
   },
   {
     sequelize,

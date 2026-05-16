@@ -9,6 +9,9 @@ import Shift from "./Shifts.js";
 import Production from "./Productions.js";
 import ProductionItem from "./ProductionItems.js";
 import Return from "./Returns.js";
+import Expense from "./Expenses.js";
+import ExpenseCategory from "./ExpenseCategory.js";
+import Damage from "./Damage.js";
 
 // Define relationships
 
@@ -144,6 +147,12 @@ Return.belongsTo(User, { foreignKey: "requested_by", as: "Requester" });
 User.hasMany(Return, { foreignKey: "approved_by", as: "ApprovedReturns" });
 Return.belongsTo(User, { foreignKey: "approved_by", as: "Approver" });
 
+// A damage report belongs to a product
+Damage.belongsTo(Product, { foreignKey: "product_id", as: "product" });
+
+// A damage report belongs to a user (reporter)
+Damage.belongsTo(User, { foreignKey: "reported_by", as: "reporter" });
+
 const db = {
   sequelize,
   User,
@@ -156,6 +165,9 @@ const db = {
   Production,
   ProductionItem,
   Return,
+  Expense,
+  ExpenseCategory,
+  Damage,
 };
 
 export default db;

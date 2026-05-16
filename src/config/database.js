@@ -32,10 +32,10 @@ const sequelize = process.env.DATABASE_URL
         dialect: "postgres",
         dialectOptions: {
           //family: 6, // Crucial for Andasy IPv6
-          ssl: {
-            require: true,
-            rejectUnauthorized: false,
-          },
+          // ssl: {
+          //   require: true,
+          //   rejectUnauthorized: false,
+          // },
         },
         logging: console.log,
       },

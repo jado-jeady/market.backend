@@ -23,6 +23,9 @@ pnpm-debug.log
 logs/
 *.log
 
+# Database
+db_backup/
+
 # Runtime data
 pids/
 *.pid

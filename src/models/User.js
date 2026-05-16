@@ -1,11 +1,11 @@
-import { Model, DataTypes } from 'sequelize';
-import sequelize from '../config/database.js';
-import bcrypt from 'bcryptjs';
+import { Model, DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
+import bcrypt from "bcryptjs";
 
 class User extends Model {
   static async hashPassword(password) {
     return await bcrypt.hash(password, 10);
-  } 
+  }
 
   async comparePassword(password) {
     return await bcrypt.compare(password, this.password_hash);
@@ -17,48 +17,47 @@ User.init(
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true
+      autoIncrement: true,
     },
     full_name: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
     },
     username: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
     },
     email: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
       validate: {
-        isEmail: true
-      }
+        isEmail: true,
+      },
     },
     password_hash: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM('Admin', 'Cashier','Storekeeper'),
-      defaultValue: 'Cashier'
+      type: DataTypes.ENUM("Admin", "Cashier", "Storekeeper", "Barista"),
+      defaultValue: "Cashier",
     },
-    shop_name:{
+    shop_name: {
       type: DataTypes.STRING,
-      defaultValue: 'masteryhub',
-      allowNull: true // change it back to false to syncronise items back the users created! 
-
+      defaultValue: "masteryhub",
+      allowNull: true, // change it back to false to syncronise items back the users created!
     },
     is_active: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
-    }
+      defaultValue: true,
+    },
   },
   {
     sequelize,
-    modelName: 'User',
-    tableName: 'users',
+    modelName: "User",
+    tableName: "users",
     timestamps: true,
     underscored: true,
     hooks: {
@@ -66,12 +65,12 @@ User.init(
         user.password_hash = await User.hashPassword(user.password_hash);
       },
       beforeUpdate: async (user) => {
-        if (user.changed('password_hash')) {
+        if (user.changed("password_hash")) {
           user.password_hash = await User.hashPassword(user.password_hash);
         }
-      }
-    }
-  }
+      },
+    },
+  },
 );
 
 export default User;

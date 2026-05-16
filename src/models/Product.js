@@ -1,5 +1,5 @@
-import { Model, DataTypes } from 'sequelize';
-import sequelize from '../config/database.js';
+import { Model, DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
 
 class Product extends Model {}
 
@@ -8,98 +8,98 @@ Product.init(
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true
+      autoIncrement: true,
     },
     name: {
       type: DataTypes.STRING,
-      allowNull: false
+      allowNull: false,
     },
     sku: {
       type: DataTypes.STRING,
       allowNull: true,
-      unique: true
+      unique: true,
     },
-    
+
     category_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'categories',
-        key: 'id'
-      }
+        model: "categories",
+        key: "id",
+      },
     },
 
     barcode: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true
+      unique: true,
     },
     product_type: {
-  type: DataTypes.ENUM('NORMAL', 'Consumable', 'Service'),
-  defaultValue: 'NORMAL'
-},
+      type: DataTypes.ENUM("NORMAL", "Consumable", "Service"),
+      defaultValue: "NORMAL",
+    },
 
-track_stock: {
-  type: DataTypes.BOOLEAN,
-  defaultValue: true
-},
+    track_stock: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
     buying_price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       validate: {
-        min: 0
-      }
+        min: 0,
+      },
     },
     selling_price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
-        min: 0
-      }
+        min: 0,
+      },
     },
-    stock_quantity: { //initial_stock for creation, updated with transactions
+    stock_quantity: {
+      //initial_stock for creation, updated with transactions
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
       validate: {
-        min: 0
-      }
+        min: 0,
+      },
     },
     vat_category: {
-      type: DataTypes.ENUM('STANDARD', 'ZERO_RATED', 'EXEMPT'),
-      defaultValue: 'STANDARD'
+      type: DataTypes.ENUM("STANDARD", "ZERO_RATED", "EXEMPT"),
+      defaultValue: "STANDARD",
     },
-    
+
     expire_date: {
       type: DataTypes.DATE,
-      allowNull: true
+      allowNull: true,
     },
     min_stock: {
       type: DataTypes.INTEGER,
-      defaultValue:10 
+      defaultValue: 10,
     },
     description: {
       type: DataTypes.TEXT,
-      allowNull: true
+      allowNull: true,
     },
     supplier: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
     },
 
     is_active: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true
-    }
-
+      defaultValue: true,
+    },
   },
   {
     sequelize,
-    modelName: 'Product',
-    tableName: 'products',
+    modelName: "Product",
+    tableName: "products",
     timestamps: true,
-    underscored: true
-  }
+    underscored: true,
+  },
 );
 
 export default Product;

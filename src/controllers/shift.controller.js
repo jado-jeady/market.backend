@@ -12,14 +12,17 @@ export const openShift = async (req, res) => {
     const cashier_id = req.user.id;
     const shop_name = "Tygamarket";
 
+    // getting the user full_name by cashier_id
+
     // Check if ANY shift in this shop is still open
     const activeShift = await Shift.findOne({
       where: { status: "OPEN", shop_name },
     });
     if (activeShift) {
+      const activeShiftUser = await User.findByPk(activeShift.cashier_id);
       return res.status(400).json({
         success: false,
-        message: `Cashier ${activeShift.cashier_id} currently has an open shift. Please close it first.`,
+        message: `Cashier ${activeShiftUser.full_name} currently has an open shift. Please close it first. or contact her on ${activeShiftUser.email}`,
       });
     }
 
@@ -72,6 +75,7 @@ export const openShift = async (req, res) => {
 export const getCurrentShift = async (req, res) => {
   try {
     const cashier_id = req.user.id;
+
     const shift = await Shift.findOne({
       where: { cashier_id, status: "OPEN" },
     });
@@ -95,7 +99,7 @@ export const getCurrentShift = async (req, res) => {
 /* ================= GET ALL SHIFTS ONLY ================= */
 export const getAllOnlyShifts = async (req, res) => {
   try {
-    const shifts = await Shift.findAll();
+    const shifts = await Shift.findAll({ order: [["created_at", "DESC"]] });
     return res.json({ success: true, data: shifts });
   } catch (error) {
     console.error("Get all shifts error:", error);
@@ -385,6 +389,54 @@ export const getLastConsumables = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch consumables",
+    });
+  }
+};
+
+// Handling the widrawal of cash
+export const withdrawShift = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const shiftId = req.params.shiftID;
+    const userId = req.user.id;
+    const shift = await Shift.findOne({
+      where: { status: "OPEN", id: shiftId },
+    });
+
+    if (!shift) {
+      return res.status(404).json({
+        success: false,
+        message: "No open shift found for this cashier",
+      });
+    }
+
+    console.log("cash withdrwal amount", amount);
+    console.log("shift opening balance", shift.opening_balance);
+    console.log("shift ID", shift.id);
+    console.log(
+      "the difference",
+      Number(shift.opening_balance) - Number(amount),
+    );
+
+    const updatedShift = await Shift.update(
+      {
+        cash_withdrawal: amount,
+        withdrawal_date: new Date(),
+        opening_balance: Number(shift.opening_balance) - Number(amount),
+      },
+      { where: { id: shift.id } },
+    );
+
+    return res.json({
+      success: true,
+      message: "Cash withdrawal successful",
+      data: updatedShift,
+    });
+  } catch (error) {
+    console.error("Withdraw cash error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to withdraw cash",
     });
   }
 };
