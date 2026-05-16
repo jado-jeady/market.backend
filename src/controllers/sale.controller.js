@@ -76,7 +76,10 @@ export const createSale = async (req, res, next) => {
       }
 
       // Calculate item totals
-      const unitPrice = product.selling_price;
+      const unitPrice = item.with_bottle
+        ? parseFloat(product.selling_price) +
+          (parseFloat(item.bottle_price) || 0)
+        : parseFloat(product.selling_price);
       const totalPrice = unitPrice * item.quantity;
 
       // Calculate VAT based on product VAT category
@@ -92,11 +95,15 @@ export const createSale = async (req, res, next) => {
       saleItems.push({
         product_id: product.id,
         quantity: item.quantity,
-        unit_price: unitPrice,
-        product_name: product.name,
+        unit_price: unitPrice, // ← now includes bottle
+        product_name: item.with_bottle
+          ? `${product.name} (+ Bottle)`
+          : product.name,
         barcode: product.barcode,
         vat_amount: vatAmount,
-        total_price: totalPrice,
+        total_price: totalPrice, // ← now includes bottle
+        with_bottle: item.with_bottle || false,
+        bottle_price: parseFloat(item.bottle_price) || 0,
       });
 
       // Update product stock

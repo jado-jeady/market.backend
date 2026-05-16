@@ -52,6 +52,16 @@ SaleItem.init(
       allowNull: true,
       defaultValue: false,
     },
+    with_bottle: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+    },
+    bottle_price: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      defaultValue: 0.0,
+    },
   },
   {
     sequelize,
