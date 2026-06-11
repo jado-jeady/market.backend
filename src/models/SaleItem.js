@@ -62,12 +62,26 @@ SaleItem.init(
       allowNull: true,
       defaultValue: 0.0,
     },
+    created_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      timestamps: true,
+      defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      timestamps: true,
+      defaultValue: sequelize.literal(
+        "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      ),
+    },
   },
+
   {
     sequelize,
     modelName: "SaleItem",
     tableName: "sale_items",
-    timestamps: false,
     underscored: true,
   },
 );

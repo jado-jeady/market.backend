@@ -96,6 +96,27 @@ export const getCurrentShift = async (req, res) => {
   }
 };
 
+/* ================= GET randomly current open shift ================= */
+export const getRandomOpenShift = async (req, res) => {
+  try {
+    const shift = await Shift.findOne({
+      where: { status: "OPEN" },
+    });
+
+    if (!shift) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No open shift found" });
+    }
+    return res.json({ success: true, data: shift });
+  } catch (error) {
+    console.error("Get random open shift error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch random open shift" });
+  }
+};
+
 /* ================= GET ALL SHIFTS ONLY ================= */
 export const getAllOnlyShifts = async (req, res) => {
   try {

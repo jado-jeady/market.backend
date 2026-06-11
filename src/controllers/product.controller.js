@@ -22,7 +22,10 @@ export const getAllProducts = async (req, res, next) => {
       is_active,
     } = req.query;
 
-    const where = {};
+    const where = {
+      product_type: ["NORMAL", "Consumable", "Service"],
+      is_active: true,
+    }; // default filter to show only normal products, active, non-barista items and active products
 
     /* 🔎 SEARCH */
     if (search) {
@@ -146,6 +149,7 @@ export const createProduct = async (req, res, next) => {
       description,
       supplier,
       isConsumable,
+      isBaristaItem,
       min_stock,
       product_type,
       track_stock,
@@ -169,23 +173,53 @@ export const createProduct = async (req, res, next) => {
       });
     }
 
-    const product = await Product.create({
-      name,
-      barcode,
-      category_id,
-      buying_price: buying_price ? parseFloat(buying_price) : 0,
-      selling_price: parseFloat(selling_price),
-      stock_quantity: track_stock === false ? 0 : parseInt(stock_quantity || 0),
-      vat_category: vat_category || "STANDARD",
-      expire_date: expire_date || null,
-      description: description || null,
-      supplier: supplier || null,
-      min_stock: min_stock || 10,
-      product_type: isConsumable ? "Consumable" : "NORMAL",
-      track_stock: track_stock !== false,
-      sku: `TGM-${Date.now()}`,
-      is_active: true,
-    });
+    /* 🧾 Determine product type */
+    let resolvedProductType = "NORMAL";
+    if (isBaristaItem) {
+      resolvedProductType = "Baristary";
+    } else if (isConsumable) {
+      resolvedProductType = "Consumable";
+    }
+
+    /* ☕ Barista items: limited fields, no stock tracking */
+    const productData = isBaristaItem
+      ? {
+          name,
+          barcode,
+          category_id,
+          selling_price: parseFloat(selling_price),
+          buying_price: 0,
+          stock_quantity: 0,
+          track_stock: false,
+          vat_category: vat_category || "STANDARD",
+          expire_date: null,
+          description: description || null,
+          supplier: null,
+          min_stock: 0,
+          product_type: resolvedProductType,
+          sku: `BAR-${Date.now()}`,
+          is_active: true,
+        }
+      : {
+          name,
+          barcode,
+          category_id,
+          buying_price: buying_price ? parseFloat(buying_price) : 0,
+          selling_price: parseFloat(selling_price),
+          stock_quantity:
+            track_stock === false ? 0 : parseInt(stock_quantity || 0),
+          vat_category: vat_category || "STANDARD",
+          expire_date: expire_date || null,
+          description: description || null,
+          supplier: supplier || null,
+          min_stock: min_stock || 10,
+          product_type: resolvedProductType,
+          track_stock: track_stock !== false,
+          sku: `TGM-${Date.now()}`,
+          is_active: true,
+        };
+
+    const product = await Product.create(productData);
 
     res.status(201).json({
       success: true,
@@ -341,6 +375,33 @@ export const getAllConsumables = async (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch consumables",
+      error: error.message,
+    });
+  }
+};
+
+// get barista items
+export const getAllBaristaItems = async (req, res, next) => {
+  try {
+    const { count, rows } = await Product.findAndCountAll({
+      where: {
+        is_active: true,
+        product_type: "Baristary",
+      },
+      order: [["created_at", "DESC"]], // optional: keep results ordered
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Barista items fetched successfully",
+      count,
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Error fetching barista items:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch barista items",
       error: error.message,
     });
   }

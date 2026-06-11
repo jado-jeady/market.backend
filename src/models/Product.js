@@ -35,7 +35,7 @@ Product.init(
       unique: true,
     },
     product_type: {
-      type: DataTypes.ENUM("NORMAL", "Consumable", "Service"),
+      type: DataTypes.ENUM("NORMAL", "Consumable", "Service", "Baristary"),
       defaultValue: "NORMAL",
     },
 

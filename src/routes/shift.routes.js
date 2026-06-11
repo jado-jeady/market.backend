@@ -9,12 +9,14 @@ import {
   getLastConsumables,
   getAllOnlyShifts,
   withdrawShift,
+  getRandomOpenShift,
 } from "../controllers/shift.controller.js";
 
 import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
+router.get("/random-open", getRandomOpenShift);
 router.get("/consumables", authenticate, getLastConsumables);
 router.post("/open", authenticate, openShift);
 router.get("/current", authenticate, getCurrentShift);
