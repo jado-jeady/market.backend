@@ -82,6 +82,7 @@ SaleItem.init(
     sequelize,
     modelName: "SaleItem",
     tableName: "sale_items",
+    timestamps: true,
     underscored: true,
   },
 );
