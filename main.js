@@ -32,15 +32,31 @@ const server = app.listen(PORT, HOST, () => {
       console.log("✅ Database connected successfully.");
     })
     .then(() => {
-      return sequelize.sync({ alter: true });
+      sequelize.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_enum
+          WHERE enumlabel = 'Baristary'
+          AND enumtypid = (
+            SELECT oid FROM pg_type WHERE typname = 'enum_products_product_type'
+          )
+        ) THEN
+          ALTER TYPE "enum_products_product_type" ADD VALUE 'Baristary';
+        END IF;
+      END
+      $$;
+    `);
+      console.log("✅ ENUM migration applied.");
     })
     .then(() => {
-      console.log("📦 Database models synced.");
+      // Sync models with the database (optional, can be removed in production)
+      sequelize.sync({ alter: true }).then(() => {
+        console.log("✅ Database synchronized.");
+      });
     })
-    .catch((err) => {
-      console.error("❌ Database connection failed:", err.message);
-      // We keep the server alive so you can check logs,
-      // but the API will likely return 500 errors for DB routes.
+    .catch((error) => {
+      console.error("❌ Database connection failed:", error);
     });
 });
 

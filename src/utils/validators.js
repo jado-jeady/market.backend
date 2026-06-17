@@ -1,45 +1,54 @@
-import { body } from 'express-validator';
+import { body } from "express-validator";
 
 export const registerValidation = [
-  body('full_name').notEmpty().withMessage('Full name is required'),
-  body('username').notEmpty().withMessage('Username is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
-  body('password')
+  body("full_name").notEmpty().withMessage("Full name is required"),
+  body("username").notEmpty().withMessage("Username is required"),
+  body("email").isEmail().withMessage("Valid email is required"),
+  body("password")
     .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters')
+    .withMessage("Password must be at least 6 characters"),
 ];
 
 export const loginValidation = [
-  body('username').notEmpty().withMessage('Username is required'),
-  body('password').notEmpty().withMessage('Password is required')
+  body("username").notEmpty().withMessage("Username is required"),
+  body("password").notEmpty().withMessage("Password is required"),
 ];
 
 export const productValidation = [
-  body('name').notEmpty().withMessage('Product name is required'),
-  body('barcode').notEmpty().withMessage('Barcode is required'),
-  body('category_id').isInt().withMessage('Valid category ID is required'),
-  body('buying_price')
+  body("name").notEmpty().withMessage("Product name is required"),
+  body("barcode").notEmpty().withMessage("Barcode is required"),
+  body("category_id").isInt().withMessage("Valid category ID is required"),
+
+  // Skip buying_price validation for barista items
+  body("buying_price")
+    .if(body("isBaristaItem").not().equals("true"))
+    .if(body("isBaristaItem").not().equals(true))
     .isFloat({ min: 0 })
-    .withMessage('Valid buying price is required'),
-  body('selling_price')
+    .withMessage("Valid buying price is required"),
+
+  body("selling_price")
     .isFloat({ min: 0 })
-    .withMessage('Valid selling price is required'),
-  body('stock_quantity')
+    .withMessage("Valid selling price is required"),
+
+  // Skip stock_quantity validation for barista items
+  body("stock_quantity")
+    .if(body("isBaristaItem").not().equals("true"))
+    .if(body("isBaristaItem").not().equals(true))
     .isInt({ min: 0 })
-    .withMessage('Valid stock quantity is required')
+    .withMessage("Valid stock quantity is required"),
 ];
 
 export const saleValidation = [
-  body('items')
+  body("items")
     .isArray({ min: 1 })
-    .withMessage('At least one item is required'),
-  body('items.*.product_id')
+    .withMessage("At least one item is required"),
+  body("items.*.product_id")
     .isInt()
-    .withMessage('Valid product ID is required'),
-  body('items.*.quantity')
+    .withMessage("Valid product ID is required"),
+  body("items.*.quantity")
     .isInt({ min: 1 })
-    .withMessage('Valid quantity is required'),
-  body('payment_method')
-    .isIn(['CASH', 'MOMO', 'CARD'])
-    .withMessage('Valid payment method is required')
+    .withMessage("Valid quantity is required"),
+  body("payment_method")
+    .isIn(["CASH", "MOMO", "CARD"])
+    .withMessage("Valid payment method is required"),
 ];

@@ -14,10 +14,26 @@ import storekeeperRoutes from "./routes/storekeeper.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import damageRoutes from "./routes/damage.routes.js";
 import e from "express";
+import os from "os";
 
 dotenv.config();
 
 const app = express();
+
+// get the local IP address of the machine
+const interfaces = os.networkInterfaces();
+let localIpAddress = "localhost"; // default to localhost so no breakage if no IP address
+
+for (const name of Object.keys(interfaces)) {
+  for (const iface of interfaces[name]) {
+    if (iface.family === "IPv4" && !iface.internal) {
+      localIpAddress = iface.address;
+      break;
+    }
+  }
+}
+
+console.log(`Local IP Address: ${localIpAddress}`);
 
 // --- FIXED CORS CONFIGURATION ---
 const allowedOrigins = [
@@ -25,7 +41,8 @@ const allowedOrigins = [
   "https://market-frontend-olive.vercel.app",
   "http://localhost:8888", // For local development
   "http://localhost:3000", // For Vite development
-  "http://192.168.0.5:3000", // For Vite development
+  `http://${localIpAddress}:3000`, // For Vite development
+  `http://${localIpAddress}:8888`, // For local development
   "https://bitter-breeze-52de.rwandamasteryhub2024.workers.dev/",
 ];
 

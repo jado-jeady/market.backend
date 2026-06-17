@@ -20,7 +20,7 @@ export const createSale = async (req, res, next) => {
       });
     }
 
-    const { items, payment_method, customer_id } = req.body;
+    const { saleType, items, payment_method, customer_id } = req.body;
     const userId = req.user.id;
 
     // Generate invoice number (YYYYMMDD-XXXXX)
@@ -48,76 +48,108 @@ export const createSale = async (req, res, next) => {
     let vatTotal = 0;
     const saleItems = [];
 
+    // If this is a barista sale, use the provided items directly and skip stock checks/updates
+    const isBarista = saleType === "baristaSales" || saleType === "baristaSale";
+
     for (const item of items) {
-      const product = await Product.findByPk(item.product_id, { transaction });
+      if (isBarista) {
+        // Expect item to have: product_id (optional), name, price, quantity
+        const quantity = Number(item.quantity) || 1;
+        const unitPrice = parseFloat(item.price) || 0;
+        const totalPrice = unitPrice * quantity;
 
-      if (!product) {
-        await transaction.rollback();
-        return res.status(404).json({
-          success: false,
-          message: `Product with ID ${item.product_id} not found`,
+        // For barista sales we assume no VAT or use provided vat if present
+        const vatAmount = item.vat_amount ? parseFloat(item.vat_amount) : 0;
+
+        subtotal += totalPrice;
+        vatTotal += vatAmount;
+
+        saleItems.push({
+          product_id: item.product_id || null,
+          quantity,
+          unit_price: unitPrice,
+          product_name: item.name || `Item ${item.product_id || ""}`,
+          barcode: item.barcode || null,
+          vat_amount: vatAmount,
+          total_price: totalPrice,
+          with_bottle: item.with_bottle || false,
+          bottle_price: parseFloat(item.bottle_price) || 0,
         });
-      }
 
-      if (product.stock_quantity < item.quantity) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for ${product.name}. Available: ${product.stock_quantity}`,
+        // NOTE: intentionally do NOT update product stock for barista sales
+      } else {
+        // Regular sale: fetch product, validate stock and active status, update stock
+        const product = await Product.findByPk(item.product_id, {
+          transaction,
         });
-      }
 
-      if (!product.is_active) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: `Product ${product.name} is not active`,
+        if (!product) {
+          await transaction.rollback();
+          return res.status(404).json({
+            success: false,
+            message: `Product with ID ${item.product_id} not found`,
+          });
+        }
+
+        if (product.stock_quantity < item.quantity) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient stock for ${product.name}. Available: ${product.stock_quantity}`,
+          });
+        }
+
+        if (!product.is_active) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Product ${product.name} is not active`,
+          });
+        }
+
+        // Calculate item totals
+        const unitPrice = item.with_bottle
+          ? parseFloat(product.selling_price) +
+            (parseFloat(item.bottle_price) || 0)
+          : parseFloat(product.selling_price);
+        const totalPrice = unitPrice * item.quantity;
+
+        // Calculate VAT based on product VAT category
+        let vatAmount = 0;
+        if (product.vat_category === "STANDARD") {
+          vatAmount = totalPrice * 0.18;
+        }
+
+        subtotal += totalPrice;
+        vatTotal += vatAmount;
+
+        saleItems.push({
+          product_id: product.id,
+          quantity: item.quantity,
+          unit_price: unitPrice,
+          product_name: item.with_bottle
+            ? `${product.name} (+ Bottle)`
+            : product.name,
+          barcode: product.barcode,
+          vat_amount: vatAmount,
+          total_price: totalPrice,
+          with_bottle: item.with_bottle || false,
+          bottle_price: parseFloat(item.bottle_price) || 0,
         });
+
+        // Update product stock
+        await product.update(
+          {
+            stock_quantity: product.stock_quantity - item.quantity,
+          },
+          { transaction },
+        );
       }
-
-      // Calculate item totals
-      const unitPrice = item.with_bottle
-        ? parseFloat(product.selling_price) +
-          (parseFloat(item.bottle_price) || 0)
-        : parseFloat(product.selling_price);
-      const totalPrice = unitPrice * item.quantity;
-
-      // Calculate VAT based on product VAT category
-      let vatAmount = 0;
-      if (product.vat_category === "STANDARD") {
-        // Assuming 18% VAT (you can make this configurable)
-        vatAmount = totalPrice * 0.18;
-      }
-
-      subtotal += totalPrice;
-      vatTotal += vatAmount;
-
-      saleItems.push({
-        product_id: product.id,
-        quantity: item.quantity,
-        unit_price: unitPrice, // ← now includes bottle
-        product_name: item.with_bottle
-          ? `${product.name} (+ Bottle)`
-          : product.name,
-        barcode: product.barcode,
-        vat_amount: vatAmount,
-        total_price: totalPrice, // ← now includes bottle
-        with_bottle: item.with_bottle || false,
-        bottle_price: parseFloat(item.bottle_price) || 0,
-      });
-
-      // Update product stock
-      await product.update(
-        {
-          stock_quantity: product.stock_quantity - item.quantity,
-        },
-        { transaction },
-      );
     }
 
     const totalAmount = subtotal + vatTotal;
 
-    // Create sale
+    // Create sale (include saleType if you want to store it)
     const sale = await Sale.create(
       {
         invoice_number: invoiceNumber,
@@ -131,6 +163,7 @@ export const createSale = async (req, res, next) => {
         total_amount: totalAmount,
         payment_method,
         status: "COMPLETED",
+        sale_type: saleType || null, // optional: store the sale type
       },
       { transaction },
     );

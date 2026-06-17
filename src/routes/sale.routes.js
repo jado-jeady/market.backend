@@ -25,12 +25,17 @@ router.use(authenticate);
 router.get("/summary", getSalesSummary);
 
 // CASHIER can create sales and view their own sales
-router.post("/", authorize("Cashier", "Admin"), saleValidation, createSale);
+router.post(
+  "/",
+  authorize("Cashier", "Admin", "Barista"),
+  saleValidation,
+  createSale,
+);
 router.get("/my-sales", getAllSales);
 router.get(
   "/sales-by-shift/:business_date",
   authenticate,
-  authorize("Cashier", "Admin"),
+  authorize("Cashier", "Admin", "Barista"),
   getCashierSalesByashiftDate,
 );
 router.get("/my-sale", authenticate, getMySales);
