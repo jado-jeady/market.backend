@@ -5,10 +5,15 @@ dotenv.config();
 
 // Use the full DATABASE_URL if it exists, otherwise fall back to separate vars (for local dev)
 const sequelize = process.env.DATABASE_URL
-  ? new Sequelize(process.env.DATABASE_URL, {
+  ? // remote db settings
+    new Sequelize(process.env.DATABASE_URL, {
       dialect: "postgres",
       dialectOptions: {
         family: 6, // Crucial for Andasy IPv6
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
       },
       logging: process.env.NODE_ENV === "development" ? console.log : false,
       pool: {
@@ -18,7 +23,8 @@ const sequelize = process.env.DATABASE_URL
         idle: 10000,
       },
     })
-  : new Sequelize(
+  : // local db settings
+    new Sequelize(
       process.env.DB_NAME,
       process.env.DB_USER,
       process.env.DB_PASSWORD,
