@@ -72,9 +72,7 @@ SaleItem.init(
       type: DataTypes.DATE,
       allowNull: true,
       timestamps: true,
-      defaultValue: sequelize.literal(
-        "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
-      ),
+      defaultValue: sequelize.literal("CURRENT_TIMESTAMP"),
     },
   },
 
