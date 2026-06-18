@@ -546,4 +546,38 @@ export const getCashierSalesByashiftDate = async (req, res, next) => {
   }
 };
 
-// getting Daiily sales
+// Getting Baristas sales
+export const getBaristaSales = async (req, res, next) => {
+  try {
+    const baristaId = req.user.id;
+    const sales = await Sale.findAll({
+      where: { user_id: baristaId },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "full_name", "username"],
+        },
+        {
+          model: SaleItem,
+          as: "items",
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "barcode"],
+            },
+          ],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({
+      success: true,
+      data: sales,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
