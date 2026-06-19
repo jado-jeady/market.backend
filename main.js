@@ -1,38 +1,40 @@
 import app from "./src/app.js";
 import sequelize from "./src/config/database.js";
 import dotenv from "dotenv";
+import { createServer } from "http";
+import { initSocket } from "./src/utils/socket.js"; // utility we wrote earlier
 
 dotenv.config();
 
-let PORT = process.env.PORT || "8888";
-let HOST = process.env.HOST || "::";
+let PORT = process.env.PORT || 8888;
+let HOST = process.env.HOST || "0.0.0.0";
 
-if ("development" === process.env.NODE_ENV) {
+if (process.env.NODE_ENV === "development") {
   PORT = 8888;
   HOST = "0.0.0.0";
 }
 
-/**
- * 1. Start the server first
- * This ensures the hosting platform (Render/Vercel) detects the open port
- * immediately, preventing "Port scan timeout" errors.
- */
 console.log(
-  `Loading the environment with this config: ${process.env.NODE_ENV} port ${PORT} host ${HOST} ...`,
+  `Loading environment: ${process.env.NODE_ENV} on ${HOST}:${PORT} ...`,
 );
-const server = app.listen(PORT, HOST, () => {
+
+// 1. Wrap Express in HTTP server
+const httpServer = createServer(app);
+
+// 2. Initialize Socket.IO
+const io = initSocket(httpServer);
+
+// 3. Start server
+httpServer.listen(PORT, HOST, async () => {
   console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
 
-  /**
-   * 2. Connect to the database after the port is open
-   */
-  sequelize
-    .authenticate()
-    .then(() => {
-      console.log("✅ Database connected successfully.");
-    })
-    .then(() => {
-      sequelize.query(`
+  try {
+    // Connect DB
+    await sequelize.authenticate();
+    console.log("✅ Database connected successfully.");
+
+    // Apply ENUM migration
+    await sequelize.query(`
       DO $$
       BEGIN
         IF NOT EXISTS (
@@ -47,23 +49,20 @@ const server = app.listen(PORT, HOST, () => {
       END
       $$;
     `);
-      console.log("✅ ENUM migration applied.");
-    })
-    .then(() => {
-      // Sync models with the database (optional, can be removed in production)
-      sequelize.sync({ alter: true }).then(() => {
-        console.log("✅ Database synchronized.");
-      });
-    })
-    .catch((error) => {
-      console.error("❌ Database connection failed:", error);
-    });
+    console.log("✅ ENUM migration applied.");
+
+    // Sync models
+    await sequelize.sync({ alter: true });
+    console.log("✅ Database synchronized.");
+  } catch (error) {
+    console.error("❌ Database connection failed:", error);
+  }
 });
 
-// Handle graceful shutdowns
+// 4. Graceful shutdown
 process.on("SIGTERM", () => {
-  console.log("SIGTERM signal received: closing HTTP server");
-  server.close(() => {
+  console.log("SIGTERM received: closing HTTP server");
+  httpServer.close(() => {
     console.log("HTTP server closed");
   });
 });
