@@ -2,6 +2,7 @@ import db from "../models/index.js";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
+import { getIO } from "../utils/socket.js";
 
 import User from "../models/User.js"; // Adjust path as needed
 import { generateToken } from "../utils/jwt.js"; // Adjust path as needed
@@ -133,6 +134,10 @@ export const login = async (req, res, next) => {
         user: userResponse,
         token,
       },
+    });
+    getIO().emit("user-login", {
+      message: user.full_name + "User logged in",
+      user: userResponse,
     });
   } catch (error) {
     next(error);

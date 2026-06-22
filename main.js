@@ -26,12 +26,12 @@ const io = initSocket(httpServer);
 
 // 3. Start server
 httpServer.listen(PORT, HOST, async () => {
-  console.log(`🚀 Server listening on http://${HOST}:${PORT}`);
+  console.log(`Server listening on http://${HOST}:${PORT}`);
 
   try {
     // Connect DB
     await sequelize.authenticate();
-    console.log("✅ Database connected successfully.");
+    console.log("Database connected successfully.");
 
     // Apply ENUM migration
     await sequelize.query(`
@@ -49,13 +49,13 @@ httpServer.listen(PORT, HOST, async () => {
       END
       $$;
     `);
-    console.log("✅ ENUM migration applied.");
+    console.log(" ENUM migration applied.");
 
     // Sync models
     await sequelize.sync({ alter: true });
-    console.log("✅ Database synchronized.");
+    console.log("Database synchronized.");
   } catch (error) {
-    console.error("❌ Database connection failed:", error);
+    console.error("Database connection failed:", error);
   }
 });
 

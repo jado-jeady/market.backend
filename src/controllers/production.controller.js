@@ -50,7 +50,7 @@ export const createProduction = async (req, res, next) => {
       return newProduction;
     });
 
-    // 🔔 Emit notification to all connected clients
+    // Socket Emit notification to all connected clients
     getIO().emit("notification", {
       id: Date.now(),
       message: `Storekeeper submitted a new production (ID: ${production.id})`,
