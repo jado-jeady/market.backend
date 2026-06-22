@@ -6,6 +6,7 @@ import {
   getSaleById,
   getCashierSalesByashiftDate,
   getSalesSummary,
+  getBaristaSales,
 } from "../controllers/sale.controller.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
 import { saleValidation } from "../utils/validators.js";
@@ -20,6 +21,9 @@ const router = express.Router();
 
 // All sale routes require authentication
 router.use(authenticate);
+
+//Barista sales
+router.get("/barista-sales", authorize("Barista"), getBaristaSales);
 
 // Sales summary - accessible by both ADMIN and CASHIER
 router.get("/summary", getSalesSummary);

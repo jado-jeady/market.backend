@@ -43,7 +43,11 @@ Sale.init(
       type: DataTypes.STRING,
       allowNull: true,
     },
-
+    is_barista: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
     payment_method: {
       type: DataTypes.ENUM("cash", "momo", "card"),
       allowNull: false,

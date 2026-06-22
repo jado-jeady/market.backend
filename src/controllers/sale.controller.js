@@ -6,6 +6,7 @@ import sequelize from "../config/database.js";
 
 const { Sale, SaleItem, Product, Shift, User } = db;
 
+// Create a new sale
 export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
@@ -163,7 +164,7 @@ export const createSale = async (req, res, next) => {
         total_amount: totalAmount,
         payment_method,
         status: "COMPLETED",
-        sale_type: saleType || null, // optional: store the sale type
+        is_barista: isBarista,
       },
       { transaction },
     );
@@ -212,6 +213,7 @@ export const createSale = async (req, res, next) => {
   }
 };
 
+// Get all sales
 export const getAllSales = async (req, res, next) => {
   try {
     let {
@@ -302,6 +304,7 @@ export const getAllSales = async (req, res, next) => {
   }
 };
 
+// Get my sales - accessible by both ADMIN and CASHIER
 export const getMySales = async (req, res, next) => {
   try {
     let { page, limit, start_date, end_date, payment_method, status } =
@@ -384,6 +387,7 @@ export const getMySales = async (req, res, next) => {
   }
 };
 
+// Get sale by id
 export const getSaleById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -542,4 +546,38 @@ export const getCashierSalesByashiftDate = async (req, res, next) => {
   }
 };
 
-// getting Daiily sales
+// Getting Baristas sales
+export const getBaristaSales = async (req, res, next) => {
+  try {
+    const baristaId = req.user.id;
+    const sales = await Sale.findAll({
+      where: { user_id: baristaId },
+      include: [
+        {
+          model: User,
+          as: "user",
+          attributes: ["id", "full_name", "username"],
+        },
+        {
+          model: SaleItem,
+          as: "items",
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "barcode"],
+            },
+          ],
+        },
+      ],
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({
+      success: true,
+      data: sales,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
