@@ -12,6 +12,7 @@ import Return from "./Returns.js";
 import Expense from "./Expenses.js";
 import ExpenseCategory from "./ExpenseCategory.js";
 import Damage from "./Damage.js";
+import Notification from "./Notification.js";
 
 // Define relationships
 
@@ -153,6 +154,16 @@ Damage.belongsTo(Product, { foreignKey: "product_id", as: "product" });
 // A damage report belongs to a user (reporter)
 Damage.belongsTo(User, { foreignKey: "reported_by", as: "reporter" });
 
+// User ↔ Notification
+User.hasMany(Notification, {
+  foreignKey: "userId",
+  as: "notifications",
+});
+Notification.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
 const db = {
   sequelize,
   User,
@@ -168,6 +179,7 @@ const db = {
   Expense,
   ExpenseCategory,
   Damage,
+  Notification,
 };
 
 export default db;
