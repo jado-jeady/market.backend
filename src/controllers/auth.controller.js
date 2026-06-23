@@ -3,9 +3,9 @@ import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import { Op } from "sequelize";
 import { getIO } from "../utils/socket.js";
-
-import User from "../models/User.js"; // Adjust path as needed
 import { generateToken } from "../utils/jwt.js"; // Adjust path as needed
+
+const { User, Notification } = db;
 
 export const register = async (req, res, next) => {
   try {
@@ -81,6 +81,7 @@ export const register = async (req, res, next) => {
 
 export const login = async (req, res, next) => {
   try {
+    // Validate input
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -91,10 +92,8 @@ export const login = async (req, res, next) => {
 
     const { username, password } = req.body;
 
-    const user = await User.findOne({
-      where: { username },
-    });
-
+    // Find user
+    const user = await User.findOne({ where: { username } });
     if (!user || !user.is_active) {
       return res.status(401).json({
         success: false,
@@ -102,10 +101,8 @@ export const login = async (req, res, next) => {
       });
     }
 
-    console.log(`username before ${username} password ${password}`);
+    // Check password
     const isValidPassword = await user.comparePassword(password);
-    console.log("compare password Out PUT:" + isValidPassword);
-
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -113,8 +110,10 @@ export const login = async (req, res, next) => {
       });
     }
 
+    // Generate token
     const token = generateToken(user);
 
+    // Prepare response object
     const userResponse = {
       id: user.id,
       full_name: user.full_name,
@@ -125,8 +124,7 @@ export const login = async (req, res, next) => {
       shop_name: user.shop_name,
     };
 
-    console.log(userResponse);
-    console.log({ userResponse: userResponse });
+    // Respond to client
     res.json({
       success: true,
       message: "Login successful",
@@ -135,10 +133,17 @@ export const login = async (req, res, next) => {
         token,
       },
     });
-    getIO().emit("user-login", {
-      message: user.full_name + "User logged in",
-      user: userResponse,
+
+    // --- Create & emit notification for Admins ---
+    const notif = await Notification.create({
+      message: `${user.full_name} logged in`,
+      role: "Admin", // only admins should see this
+      targetUrl: `/admin/management`, // optional: route to user management
+      userId: user.id,
     });
+
+    // Emit to Admin room with consistent event name
+    getIO().to("Admin").emit("notification", notif);
   } catch (error) {
     next(error);
   }

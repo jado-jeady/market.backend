@@ -13,6 +13,7 @@ import ShiftRoutes from "./routes/shift.routes.js";
 import storekeeperRoutes from "./routes/storekeeper.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import damageRoutes from "./routes/damage.routes.js";
+import notificationRoutes from "./routes/notifications.routes.js";
 import e from "express";
 import os from "os";
 
@@ -100,6 +101,7 @@ app.use("/api/storekeeper", storekeeperRoutes);
 app.use("/api/shift", ShiftRoutes);
 app.use("/api/expense", expenseRoutes);
 app.use("/api/damage", damageRoutes);
+app.use("/api/notifications", notificationRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

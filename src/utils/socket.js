@@ -19,6 +19,13 @@ export const initSocket = (httpServer) => {
 
   io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
+
+    // 🔑 Handle role joining
+    socket.on("joinRole", (role) => {
+      socket.join(role);
+      console.log(`Socket ${socket.id} joined role room: ${role}`);
+    });
+
     socket.on("disconnect", () => {
       console.log("Client disconnected:", socket.id);
     });

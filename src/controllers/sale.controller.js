@@ -496,12 +496,17 @@ export const getCashierSalesByashiftDate = async (req, res, next) => {
   try {
     const { business_date } = req.params;
     const cashierId = req.user.id; // Get the logged-in cashier's ID
-    // ✅ Add this check to prevent SQL errors
-    if (!business_date || business_date === "Invalid date") {
-      return res.status(400).json({
-        success: false,
-        message: "A valid business date is required.",
-      });
+
+    // If no date provided, default to today
+    let dbDate;
+    if (business_date) {
+      const parsed = new Date(business_date);
+      if (isNaN(parsed.getTime())) {
+        throw new Error("Invalid date format");
+      }
+      dbDate = parsed.toISOString().split("T")[0]; // YYYY-MM-DD
+    } else {
+      dbDate = new Date().toISOString().split("T")[0]; // today
     }
 
     const sales = await Sale.findAll({
@@ -511,7 +516,7 @@ export const getCashierSalesByashiftDate = async (req, res, next) => {
           model: Shift,
           as: "shift",
           attributes: ["business_date"],
-          where: { business_date }, // Filter by the shift date
+          where: { business_date: dbDate }, // Filter by the shift date
           required: true,
         },
         {
