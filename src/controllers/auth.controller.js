@@ -138,7 +138,7 @@ export const login = async (req, res, next) => {
     const notif = await Notification.create({
       message: `${user.full_name} logged in`,
       role: "Admin", // only admins should see this
-      targetUrl: `/admin/management`, // optional: route to user management
+      targetUrl: `/admin/management/users`, // optional: route to user management
       userId: user.id,
     });
 

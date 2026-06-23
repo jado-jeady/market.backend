@@ -3,11 +3,10 @@ import db from "../models/index.js";
 
 const { Notification, User } = db;
 // CREATE notification (usually called inside other controllers)
-export const createNotification = async (req, res) => {
+export const createNotification = async (message, role, targetUrl, userId) => {
   try {
-    const { message, role, targetUrl } = req.body;
-    const userId = req.user?.id; // who triggered it
-
+    // Create notification
+    console.log({ message, role, targetUrl, userId });
     const notif = await Notification.create({
       message,
       role,
@@ -25,7 +24,6 @@ export const createNotification = async (req, res) => {
     });
   } catch (error) {
     console.error("Create Notification Error:", error);
-    res.status(500).json({ message: "Failed to create notification" });
   }
 };
 
