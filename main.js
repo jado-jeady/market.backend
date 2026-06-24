@@ -53,7 +53,7 @@ httpServer.listen(PORT, HOST, async () => {
 
     // Sync models
     await sequelize.sync({ alter: true });
-    console.log("Database synchronized.");
+    console.log("successfully Database synchronized.");
   } catch (error) {
     console.error("Database connection failed:", error);
   }
