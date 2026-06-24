@@ -12,6 +12,7 @@ import Return from "./Returns.js";
 import Expense from "./Expenses.js";
 import ExpenseCategory from "./ExpenseCategory.js";
 import Damage from "./Damage.js";
+import Notification from "./Notification.js";
 
 // Define relationships
 
@@ -113,8 +114,13 @@ Shift.hasMany(Sale, { foreignKey: "shift_id", as: "sales" });
 // In Sale.js
 Sale.belongsTo(Shift, { foreignKey: "shift_id", as: "shift" });
 // shift to user relationship
-User.hasMany(Shift, { foreignKey: "user_id", as: "shifts" });
-Shift.belongsTo(User, { foreignKey: "user_id", as: "user" });
+// Shift ↔ User (cashier)
+User.hasMany(Shift, { foreignKey: "cashier_id", as: "cashierShifts" });
+Shift.belongsTo(User, { foreignKey: "cashier_id", as: "cashier" });
+
+// Shift ↔ User (creator/owner)
+User.hasMany(Shift, { foreignKey: "user_id", as: "createdShifts" });
+Shift.belongsTo(User, { foreignKey: "user_id", as: "creator" });
 
 // ----------------------RETURNS Relationships ----------------
 
@@ -153,6 +159,16 @@ Damage.belongsTo(Product, { foreignKey: "product_id", as: "product" });
 // A damage report belongs to a user (reporter)
 Damage.belongsTo(User, { foreignKey: "reported_by", as: "reporter" });
 
+// User ↔ Notification
+User.hasMany(Notification, {
+  foreignKey: "userId",
+  as: "notifications",
+});
+Notification.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
 const db = {
   sequelize,
   User,
@@ -168,6 +184,7 @@ const db = {
   Expense,
   ExpenseCategory,
   Damage,
+  Notification,
 };
 
 export default db;

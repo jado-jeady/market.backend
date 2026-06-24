@@ -1,8 +1,10 @@
 import db from "../models/index.js";
 import { Op } from "sequelize";
 import { getIO } from "../utils/socket.js";
+import { createNotification } from "./notifications.controller.js";
 
-const { Production, ProductionItem, Product, User, sequelize } = db;
+const { Production, ProductionItem, Product, User, sequelize, Notification } =
+  db;
 
 /* =========================================================
    1️⃣ STOREKEEPER - SUBMIT PRODUCTION (PENDING)
@@ -50,12 +52,22 @@ export const createProduction = async (req, res, next) => {
       return newProduction;
     });
 
-    // 🔔 Emit notification to all connected clients
-    getIO().emit("notification", {
-      id: Date.now(),
-      message: `Storekeeper submitted a new production (ID: ${production.id})`,
-      read: false,
-    });
+    // create notifications on successful production submission
+    const roles = ["Cashier", "Admin"];
+
+    for (const role of roles) {
+      const notif = await Notification.create({
+        message: "New production submitted",
+        role,
+        targetUrl:
+          role === "Cashier"
+            ? "/user/consumables/pending"
+            : "/admin/productions/pending",
+        userId: req.user.id,
+      });
+
+      getIO().to(role).emit("notification", notif);
+    }
 
     res.status(201).json({
       success: true,
@@ -112,6 +124,25 @@ export const approveProduction = async (req, res, next) => {
       await production.save({ transaction: t });
     });
 
+    //create a notification for the storekeeper and admin
+
+    const roles = ["Storekeeper", "Admin"];
+
+    for (const role of roles) {
+      const notif = await Notification.create({
+        message: "Production approved",
+        role,
+        targetUrl:
+          role === "Storekeeper"
+            ? "/storekeeper/consumables/approved"
+            : "/admin/productions/approved",
+        userId: req.user.id,
+      });
+
+      // Emit to correct role room
+      getIO().to(role).emit("notification", notif);
+    }
+
     res.json({
       success: true,
       message: "Production approved and stock updated",
@@ -151,6 +182,18 @@ export const rejectProduction = async (req, res, next) => {
     production.rejection_reason = rejection_reason;
 
     await production.save();
+
+    //create a notification for the storekeeper
+    const notif = await Notification.create({
+      message: `Production Batch # ${production.id} rejected`,
+      role: "Storekeeper",
+      targetUrl: "/storekeeper/consumables/view",
+      userId: req.user.id,
+    });
+
+    // Emit to correct role room
+    getIO().to("Storekeeper").emit("notification", notif);
+    getIO().to("Admin").emit("notification", notif);
 
     res.json({
       success: true,
