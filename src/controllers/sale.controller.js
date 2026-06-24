@@ -559,11 +559,6 @@ export const getBaristaSales = async (req, res, next) => {
       where: { user_id: baristaId },
       include: [
         {
-          model: User,
-          as: "user",
-          attributes: ["id", "full_name", "username"],
-        },
-        {
           model: SaleItem,
           as: "items",
           include: [
