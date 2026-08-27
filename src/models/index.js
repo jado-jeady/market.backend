@@ -121,7 +121,11 @@ Shift.belongsTo(User, { foreignKey: "cashier_id", as: "cashier" });
 
 // Shift ↔ User (creator/owner)
 User.hasMany(Shift, { foreignKey: "user_id", as: "createdShifts" });
-Shift.belongsTo(User, { foreignKey: "user_id", as: "creator" });
+Shift.belongsTo(User, {
+  foreignKey: "user_id",
+  as: "creator",
+  constraints: false,
+});
 
 // ----------------------RETURNS Relationships ----------------
 
