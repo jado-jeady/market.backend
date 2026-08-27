@@ -13,6 +13,7 @@ import Expense from "./Expenses.js";
 import ExpenseCategory from "./ExpenseCategory.js";
 import Damage from "./Damage.js";
 import Notification from "./Notification.js";
+import PriceChange from "./PriceChange.js";
 
 // Define relationships
 
@@ -160,14 +161,14 @@ Damage.belongsTo(Product, { foreignKey: "product_id", as: "product" });
 Damage.belongsTo(User, { foreignKey: "reported_by", as: "reporter" });
 
 // User ↔ Notification
-User.hasMany(Notification, {
-  foreignKey: "userId",
-  as: "notifications",
-});
-Notification.belongsTo(User, {
-  foreignKey: "userId",
-  as: "user",
-});
+User.hasMany(Notification, { foreignKey: "userId", as: "notifications" });
+Notification.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+// Associations of PriceChange with Product and User
+PriceChange.belongsTo(Product, { foreignKey: "product_id", as: "product" });
+Product.hasMany(PriceChange, { foreignKey: "product_id", as: "price_changes" }); // to reverse on manyto-one relationship
+
+PriceChange.belongsTo(User, { foreignKey: "changed_by", as: "changedBy" });
 
 const db = {
   sequelize,
@@ -185,6 +186,7 @@ const db = {
   ExpenseCategory,
   Damage,
   Notification,
+  PriceChange,
 };
 
 export default db;

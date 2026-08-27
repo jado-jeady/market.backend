@@ -45,6 +45,8 @@ const allowedOrigins = [
   `http://${localIpAddress}:3000`, // For Vite development
   `http://${localIpAddress}:8888`, // For local development
   "https://bitter-breeze-52de.rwandamasteryhub2024.workers.dev/",
+  "https://jpp6mz6q-3001.uks1.devtunnels.ms",
+  "https://pat-plumulose-lukas.ngrok-free.dev/",
 ];
 
 app.use(
@@ -87,7 +89,7 @@ app.get("/", (req, res) => {
     status: `active`,
     message: "Welcome to Supermarket Management System API",
     version: "1.0.0",
-    documentation: `View the documentation here ${"http://localhost/api/documentation"} `,
+    documentation: `View the documentation here ${"http://localhost:3000/api/documentation"} `,
   });
 });
 
@@ -108,7 +110,7 @@ app.use((req, res) => {
     success: false,
     status: `inactive`,
     message: `Cannot ${req.method} ${req.url}`,
-    waring: `conntact the admin via 0782228575 for more information or read this documentation http:localhost:3000/api/documentation`,
+    warning: `contact the admin via 0782228575 for more information or read this documentation http://localhost:3000/api/documentation`,
   });
 });
 

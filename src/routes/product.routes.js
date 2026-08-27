@@ -9,6 +9,9 @@ import {
   deleteProduct,
   getAllConsumables,
   getAllBaristaItems,
+  getProductPriceHistory,
+  getPriceChangeSummary,
+  getAllPriceChanges,
 } from "../controllers/product.controller.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
 import { productValidation } from "../utils/validators.js";
@@ -32,6 +35,26 @@ router.get("/:id", getProductById);
 router.use(authenticate);
 
 // Product creation/modification requires ADMIN role
+// Update product (with price change tracking)
+router.put(
+  "/:id",
+  authorize("Admin", "Storekeeper"),
+  productValidation,
+  updateProduct,
+);
+
+// Get price change history for a specific product
+router.get(
+  "/:id/price-history",
+  authorize("Admin", "Storekeeper"),
+  getProductPriceHistory,
+);
+
+// Get price change summary for dashboard
+router.get("/price-changes/summary", authorize("Admin"), getPriceChangeSummary);
+
+// Get all price changes with filters
+router.get("/price-changes", authorize("Admin"), getAllPriceChanges);
 
 router.post("/", authorize("Admin"), productValidation, createProduct);
 router.put("/:id", authorize("Admin"), productValidation, updateProduct);

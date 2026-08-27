@@ -39,7 +39,7 @@ const sequelize = process.env.DATABASE_URL
           //   rejectUnauthorized: false,
           // },
         },
-        logging: console.log,
+        logging: false,
       },
     );
 
