@@ -20,6 +20,7 @@ export const createDamageReport = async (req, res, next) => {
       description,
       location,
       estimated_cost,
+      quantity,
       witnesses,
       incident_date,
     } = req.body;
@@ -56,6 +57,7 @@ export const createDamageReport = async (req, res, next) => {
       damage_type,
       severity,
       reported_by,
+      quantity: quantity || 1,
       description,
       location: location || null,
       estimated_cost: estimated_cost || null,
@@ -222,11 +224,14 @@ export const getDamageReportById = async (req, res, next) => {
 export const updateReportStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
-    if (!["Pending", "In Review", "Resolved"].includes(status)) {
+    const validStatuses = ["Pending", "In Review", "Resolved", "Rejected"];
+
+    if (!validStatuses.includes(status)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid status value." });
     }
+
     const report = await Damage.findByPk(req.params.id);
     if (!report)
       return res
@@ -234,7 +239,19 @@ export const updateReportStatus = async (req, res, next) => {
         .json({ success: false, message: "Report not found." });
 
     await report.update({ status });
-    return res.json({ success: true, data: report });
+
+    // Fetch updated report with product association
+    const updatedReport = await Damage.findByPk(req.params.id, {
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "barcode"],
+        },
+      ],
+    });
+
+    return res.json({ success: true, data: updatedReport });
   } catch (err) {
     next(err);
   }

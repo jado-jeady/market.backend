@@ -1,3 +1,5 @@
+// this file is nolonger used, but kept for reference. The database connection is now handled in config/config.cjs with migration and seeding handled by sequelize-cli. The database connection is now imported in main.js and used to authenticate and sync the models.
+
 import { Sequelize } from "sequelize";
 import dotenv from "dotenv";
 
@@ -39,7 +41,7 @@ const sequelize = process.env.DATABASE_URL
           //   rejectUnauthorized: false,
           // },
         },
-        logging: console.log,
+        logging: false,
       },
     );
 

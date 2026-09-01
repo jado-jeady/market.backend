@@ -1,8 +1,8 @@
 import db from "../models/index.js";
 import { Op, where } from "sequelize";
 import { validationResult } from "express-validator";
-
-const { Product, Category, SaleItem } = db;
+import sequelize from "../config/database.js";
+const { Product, Category, SaleItem, User, PriceChange } = db;
 
 /* =====================================================
    GET ALL PRODUCTS (WITH FILTERS + PAGINATION)
@@ -232,46 +232,6 @@ export const createProduct = async (req, res, next) => {
 };
 
 /* =====================================================
-   UPDATE PRODUCT
-===================================================== */
-export const updateProduct = async (req, res, next) => {
-  try {
-    const product = await Product.findByPk(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
-    }
-
-    /* 🚫 Prevent duplicate barcode */
-    if (req.body.barcode && req.body.barcode !== product.barcode) {
-      const exists = await Product.findOne({
-        where: { barcode: req.body.barcode },
-      });
-
-      if (exists) {
-        return res.status(400).json({
-          success: false,
-          message: "Barcode already exists",
-        });
-      }
-    }
-
-    await product.update(req.body);
-
-    res.json({
-      success: true,
-      message: "Product updated successfully",
-      data: product,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/* =====================================================
    DELETE PRODUCT
 ===================================================== */
 export const deleteProduct = async (req, res, next) => {
@@ -403,6 +363,309 @@ export const getAllBaristaItems = async (req, res, next) => {
       success: false,
       message: "Failed to fetch barista items",
       error: error.message,
+    });
+  }
+};
+
+//#############################Price Change History#####################################
+
+// /* =====================================================
+//    UPDATE PRODUCT
+// ===================================================== */
+// export const updateProduct = async (req, res, next) => {
+//   try {
+//     const product = await Product.findByPk(req.params.id);
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     /* 🚫 Prevent duplicate barcode */
+//     if (req.body.barcode && req.body.barcode !== product.barcode) {
+//       const exists = await Product.findOne({
+//         where: { barcode: req.body.barcode },
+//       });
+
+//       if (exists) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Barcode already exists",
+//         });
+//       }
+//     }
+
+//     await product.update(req.body);
+
+//     res.json({
+//       success: true,
+//       message: "Product updated successfully",
+//       data: product,
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
+export const updateProduct = async (req, res, next) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    // Prevent duplicate barcode
+    if (req.body.barcode && req.body.barcode !== product.barcode) {
+      const exists = await Product.findOne({
+        where: { barcode: req.body.barcode },
+      });
+
+      if (exists) {
+        return res.status(400).json({
+          success: false,
+          message: "Barcode already exists",
+        });
+      }
+    }
+
+    // Store old price for price change tracking
+    const oldPrice = parseFloat(product.selling_price);
+    const newPrice = req.body.selling_price
+      ? parseFloat(req.body.selling_price)
+      : oldPrice;
+
+    // Update product
+    await product.update(req.body);
+
+    // Track price change if selling price changed
+    if (oldPrice !== newPrice) {
+      await PriceChange.create({
+        product_id: product.id,
+        old_price: oldPrice,
+        new_price: newPrice,
+        price_difference: newPrice - oldPrice,
+        changed_by: req.user.id,
+        change_reason:
+          req.body.change_reason || "Price updated via product edit",
+        change_type: newPrice > oldPrice ? "INCREASE" : "DECREASE",
+      });
+
+      console.log(
+        `💰 Price change for product ${product.id}: ${oldPrice} → ${newPrice} by user ${req.user.id}`,
+      );
+    }
+
+    // Fetch the updated product with price changes
+    const updatedProduct = await Product.findByPk(req.params.id, {
+      include: [
+        {
+          model: PriceChange,
+          as: "price_changes",
+          limit: 5,
+          order: [["created_at", "DESC"]],
+          include: [
+            {
+              model: User,
+              as: "changedBy",
+              attributes: ["id", "full_name", "email"],
+            },
+          ],
+        },
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "name"],
+        },
+      ],
+    });
+
+    res.json({
+      success: true,
+      message: "Product updated successfully",
+      data: updatedProduct,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get price change history for a product
+export const getProductPriceHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 20, offset = 0 } = req.query;
+
+    const priceChanges = await PriceChange.findAndCountAll({
+      where: { product_id: id },
+      order: [["created_at", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        {
+          model: User,
+          as: "changedBy",
+          attributes: ["id", "full_name", "email"],
+        },
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "barcode"],
+        },
+      ],
+    });
+
+    res.json({
+      success: true,
+      data: priceChanges.rows,
+      total: priceChanges.count,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+  } catch (error) {
+    console.error("Error fetching price history:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch price history",
+    });
+  }
+};
+
+// Get price change summary for dashboard
+export const getPriceChangeSummary = async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const dateLimit = new Date();
+    dateLimit.setDate(dateLimit.getDate() - parseInt(days));
+
+    const [totalChanges, changesByType, recentChanges] = await Promise.all([
+      PriceChange.count({
+        where: {
+          created_at: {
+            [Op.gte]: dateLimit,
+          },
+        },
+      }),
+      PriceChange.findAll({
+        attributes: [
+          "change_type",
+          [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+        ],
+        where: {
+          created_at: {
+            [Op.gte]: dateLimit,
+          },
+        },
+        group: ["change_type"],
+        raw: true,
+      }),
+      PriceChange.findAll({
+        where: {
+          created_at: {
+            [Op.gte]: dateLimit,
+          },
+        },
+        order: [["created_at", "DESC"]],
+        limit: 10,
+        include: [
+          {
+            model: Product,
+            as: "product",
+            attributes: ["id", "name"],
+          },
+          {
+            model: User,
+            as: "changedBy",
+            attributes: ["id", "full_name"],
+          },
+        ],
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        total_changes: totalChanges,
+        changes_by_type: changesByType,
+        recent_changes: recentChanges,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching price change summary:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch price change summary",
+    });
+  }
+};
+
+// Get all price changes with filters
+export const getAllPriceChanges = async (req, res) => {
+  try {
+    const {
+      limit = 50,
+      offset = 0,
+      product_id,
+      change_type,
+      start_date,
+      end_date,
+    } = req.query;
+
+    const where = {};
+
+    if (product_id) where.product_id = parseInt(product_id);
+    if (change_type) where.change_type = change_type;
+
+    if (start_date && end_date) {
+      where.created_at = {
+        [Op.between]: [new Date(start_date), new Date(end_date)],
+      };
+    } else if (start_date) {
+      where.created_at = {
+        [Op.gte]: new Date(start_date),
+      };
+    } else if (end_date) {
+      where.created_at = {
+        [Op.lte]: new Date(end_date),
+      };
+    }
+
+    const priceChanges = await PriceChange.findAndCountAll({
+      where,
+      order: [["created_at", "DESC"]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "barcode", "sku"],
+        },
+        {
+          model: User,
+          as: "changedBy",
+          attributes: ["id", "full_name", "email"],
+        },
+      ],
+    });
+
+    res.json({
+      success: true,
+      data: priceChanges.rows,
+      total: priceChanges.count,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+  } catch (error) {
+    console.error("Error fetching price changes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch price changes",
     });
   }
 };

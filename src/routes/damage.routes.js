@@ -24,5 +24,6 @@ router.route("/my/reports").get(getMyDamageReports); // new route for user's own
 router.route("/:id").get(getDamageReportById).delete(deleteDamageReport);
 
 router.patch("/:id/status", updateReportStatus);
+router.delete("/:id", deleteDamageReport);
 
 export default router;

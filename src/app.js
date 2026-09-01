@@ -45,8 +45,9 @@ const allowedOrigins = [
   `http://${localIpAddress}:3000`, // For Vite development
   `http://${localIpAddress}:8888`, // For local development
   "https://bitter-breeze-52de.rwandamasteryhub2024.workers.dev/",
+  "https://jpp6mz6q-3001.uks1.devtunnels.ms",
+  "https://pat-plumulose-lukas.ngrok-free.dev/",
 ];
-
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -69,17 +70,14 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
-// Note: You have sync here AND in main.js. It's cleaner to keep it in one place.
-
 // Routes
 app.get("/", (req, res) => {
   res.json({
     success: true,
     status: `active`,
     message: "Welcome to Supermarket Management System API",
-    version: "1.0.0",
-    documentation: `View the documentation here ${"http://localhost/api/documentation"} `,
+    version: "2.2.0",
+    documentation: `View the documentation here ${"https://marketpos.rw/documentation"} `,
   });
 });
 
@@ -94,13 +92,14 @@ app.use("/api/shift", ShiftRoutes);
 app.use("/api/expense", expenseRoutes);
 app.use("/api/damage", damageRoutes);
 app.use("/api/notifications", notificationRoutes);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
     status: `inactive`,
     message: `Cannot ${req.method} ${req.url}`,
-    waring: `conntact the admin via 0782228575 for more information or read this documentation http:localhost:3000/api/documentation`,
+    warning: `contact the admin via 0782228575 for more information or read this documentation http://localhost:3000/api/documentation`,
   });
 });
 

@@ -26,6 +26,11 @@ Damage.init(
       references: { model: "products", key: "id" },
       onDelete: "RESTRICT",
     },
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
 
     // ── FK → users (who reported it) ──
     reported_by: {
@@ -56,7 +61,7 @@ Damage.init(
     },
 
     status: {
-      type: DataTypes.ENUM("Pending", "InReview", "Resolved"),
+      type: DataTypes.ENUM("Pending", "InReview", "Resolved", "Rejected"),
       allowNull: false,
       defaultValue: "Pending",
     },
