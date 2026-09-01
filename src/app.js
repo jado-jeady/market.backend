@@ -48,7 +48,6 @@ const allowedOrigins = [
   "https://jpp6mz6q-3001.uks1.devtunnels.ms",
   "https://pat-plumulose-lukas.ngrok-free.dev/",
 ];
-
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -71,25 +70,14 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
-// Note: You have sync here AND in main.js. It's cleaner to keep it in one place.
-db.sequelize
-  .sync({ alter: true })
-  .then(() => {
-    console.log("✅ Database synchronized");
-  })
-  .catch((err) => {
-    console.error("❌ Database synchronization error:", err);
-  });
-
 // Routes
 app.get("/", (req, res) => {
   res.json({
     success: true,
     status: `active`,
     message: "Welcome to Supermarket Management System API",
-    version: "1.0.0",
-    documentation: `View the documentation here ${"http://localhost:3000/api/documentation"} `,
+    version: "2.2.0",
+    documentation: `View the documentation here ${"https://marketpos.rw/documentation"} `,
   });
 });
 
@@ -104,6 +92,7 @@ app.use("/api/shift", ShiftRoutes);
 app.use("/api/expense", expenseRoutes);
 app.use("/api/damage", damageRoutes);
 app.use("/api/notifications", notificationRoutes);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
