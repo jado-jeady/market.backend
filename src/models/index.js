@@ -14,6 +14,7 @@ import ExpenseCategory from "./ExpenseCategory.js";
 import Damage from "./Damage.js";
 import Notification from "./Notification.js";
 import PriceChange from "./PriceChange.js";
+import Report from "./Reports.js";
 
 // Define relationships
 
@@ -174,6 +175,10 @@ Product.hasMany(PriceChange, { foreignKey: "product_id", as: "price_changes" });
 
 PriceChange.belongsTo(User, { foreignKey: "changed_by", as: "changedBy" });
 
+// Report associations
+User.hasMany(Report, { foreignKey: "generated_by", as: "reports" });
+Report.belongsTo(User, { foreignKey: "generated_by", as: "generatedBy" });
+
 const db = {
   sequelize,
   User,
@@ -191,6 +196,7 @@ const db = {
   Damage,
   Notification,
   PriceChange,
+  Report,
 };
 
 export default db;

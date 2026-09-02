@@ -257,7 +257,7 @@ export const updateReportStatus = async (req, res, next) => {
   }
 };
 
-// ── DELETE /api/damage-reports/:id ───────────────────────────────────────────
+// ── DELETE /api/damage-reports/:id ──────────────────────
 export const deleteDamageReport = async (req, res, next) => {
   try {
     const report = await Damage.findByPk(req.params.id);

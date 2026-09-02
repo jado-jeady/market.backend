@@ -14,6 +14,7 @@ import storekeeperRoutes from "./routes/storekeeper.routes.js";
 import expenseRoutes from "./routes/expense.routes.js";
 import damageRoutes from "./routes/damage.routes.js";
 import notificationRoutes from "./routes/notifications.routes.js";
+import reportRoutes from "./routes/report.routes.js";
 import e from "express";
 import os from "os";
 
@@ -92,6 +93,7 @@ app.use("/api/shift", ShiftRoutes);
 app.use("/api/expense", expenseRoutes);
 app.use("/api/damage", damageRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/reports", reportRoutes);
 
 // 404 handler
 app.use((req, res) => {
