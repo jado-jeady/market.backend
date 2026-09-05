@@ -1,8 +1,10 @@
 // migrations/20260905111736-update-report-date-fields-to-include-time.js
 export default {
   up: async (queryInterface, Sequelize) => {
-    // Use transaction for safety
-    const transaction = await queryInterface.sequelize.transaction();
+    // Use transaction with timeout
+    const transaction = await queryInterface.sequelize.transaction({
+      timeout: 60000, // 60 seconds timeout
+    });
 
     try {
       console.log("🔍 Checking current table structure...");
@@ -25,7 +27,6 @@ export default {
 
       // ---- HANDLE date_range_from ----
       if (!columns["date_range_from"]) {
-        // Column doesn't exist, create it
         console.log("📝 Creating date_range_from column...");
         await queryInterface.addColumn(
           "reports",
@@ -37,7 +38,6 @@ export default {
           { transaction },
         );
 
-        // Populate from existing columns if they exist
         if (columns["date_range_from_tz"]) {
           await queryInterface.sequelize.query(
             `
@@ -54,13 +54,11 @@ export default {
           );
         }
       } else {
-        // Column exists but might be DATEONLY
         const isDateOnly =
           !columns["date_range_from"].type?.includes("timestamp");
 
         if (isDateOnly) {
           console.log("📝 Converting date_range_from to timestamp...");
-          // Add temp column
           await queryInterface.addColumn(
             "reports",
             "date_range_from_temp",
@@ -71,7 +69,6 @@ export default {
             { transaction },
           );
 
-          // Copy data with proper casting
           await queryInterface.sequelize.query(
             `
             UPDATE reports 
@@ -80,12 +77,9 @@ export default {
             { transaction },
           );
 
-          // Drop old column
           await queryInterface.removeColumn("reports", "date_range_from", {
             transaction,
           });
-
-          // Rename temp to final
           await queryInterface.renameColumn(
             "reports",
             "date_range_from_temp",
@@ -192,7 +186,7 @@ export default {
         { transaction },
       );
 
-      // ---- CLEAN UP EXTRA COLUMNS ----
+      // ---- CLEAN UP EXTRA COLUMNS (with error handling) ----
       console.log("📝 Cleaning up extra columns...");
       const extraColumns = [
         "date_range_from_tz",
@@ -207,11 +201,13 @@ export default {
         try {
           const cols = await queryInterface.describeTable("reports");
           if (cols[col]) {
+            console.log(`   ⏳ Removing ${col}...`);
             await queryInterface.removeColumn("reports", col, { transaction });
             console.log(`   ✅ Removed ${col}`);
           }
         } catch (e) {
-          // Column doesn't exist, skip
+          // Column doesn't exist or can't be removed, skip
+          console.log(`   ⚠️ Skipped ${col} (${e.message})`);
         }
       }
 
@@ -230,13 +226,9 @@ export default {
 
     try {
       console.log("↩️ Rolling back migration...");
-
-      // Check current columns
       const columns = await queryInterface.describeTable("reports");
 
-      // Only rollback if we have timestamp columns
       if (columns["date_range_from"]?.type?.includes("timestamp")) {
-        // Add temp DATEONLY columns
         await queryInterface.addColumn(
           "reports",
           "date_range_from_temp",
@@ -257,7 +249,6 @@ export default {
           { transaction },
         );
 
-        // Copy data
         await queryInterface.sequelize.query(
           `
           UPDATE reports 
@@ -267,15 +258,12 @@ export default {
           { transaction },
         );
 
-        // Drop old columns
         await queryInterface.removeColumn("reports", "date_range_from", {
           transaction,
         });
         await queryInterface.removeColumn("reports", "date_range_to", {
           transaction,
         });
-
-        // Rename temp to final
         await queryInterface.renameColumn(
           "reports",
           "date_range_from_temp",
@@ -289,7 +277,6 @@ export default {
           { transaction },
         );
 
-        // Make nullable
         await queryInterface.changeColumn(
           "reports",
           "date_range_from",
