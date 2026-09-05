@@ -206,16 +206,40 @@ export const generateStockReport = async (req, res) => {
 };
 
 // Generate Financial Report
+// In report.controller.js - Update the generateFinancialReport function
+
 export const generateFinancialReport = async (req, res) => {
   try {
-    const { dateRange, reportName } = req.body;
+    const { dateRange, reportName, startTime, endTime } = req.body;
     const { from, to } = dateRange;
+
+    // Build time-based filter if provided
+    let timeFilter = {};
+    let fromDateTime, toDateTime;
+
+    if (startTime && endTime) {
+      // Combine date and time
+      fromDateTime = new Date(`${from}T${startTime}:00`);
+      toDateTime = new Date(`${to}T${endTime}:59`);
+      timeFilter = {
+        created_at: {
+          [Op.between]: [fromDateTime, toDateTime],
+        },
+      };
+    } else {
+      // Default to full day
+      fromDateTime = new Date(`${from}T00:00:00`);
+      toDateTime = new Date(`${to}T23:59:59`);
+      timeFilter = {
+        created_at: {
+          [Op.between]: [fromDateTime, toDateTime],
+        },
+      };
+    }
 
     const sales = await Sale.findAll({
       where: {
-        created_at: {
-          [Op.between]: [new Date(from), new Date(to + "T23:59:59")],
-        },
+        ...timeFilter,
         status: "COMPLETED",
       },
       include: [
@@ -224,54 +248,96 @@ export const generateFinancialReport = async (req, res) => {
           as: "user",
           attributes: ["id", "full_name"],
         },
+        {
+          model: SaleItem,
+          as: "items",
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "buying_price", "selling_price"],
+            },
+          ],
+        },
       ],
     });
 
-    const totalRevenue = sales.reduce(
-      (sum, s) => sum + parseFloat(s.total_amount || 0),
-      0,
-    );
-    const totalVAT = sales.reduce(
-      (sum, s) => sum + parseFloat(s.vat_total || 0),
-      0,
-    );
-    const totalDiscounts = sales.reduce(
-      (sum, s) => sum + parseFloat(s.discount_amount || 0),
-      0,
-    );
-    const totalTransactions = sales.length;
+    let totalRevenue = 0;
+    let totalVAT = 0;
+    let totalDiscounts = 0;
+    let totalTransactions = sales.length;
+    let totalBuyingPrice = 0;
+    let totalSellingPrice = 0;
+    let totalProfit = 0;
 
     const dailyRevenue = {};
-    sales.forEach((sale) => {
-      // Ensure created_at is a Date
-      const dateObj = new Date(sale.created_at);
-
-      // Format to YYYY-MM-DD
-      const date = dateObj.toISOString().split("T")[0];
-
-      if (!dailyRevenue[date]) {
-        dailyRevenue[date] = 0;
-      }
-      dailyRevenue[date] += parseFloat(sale.total_amount || 0);
-    });
-
     const topCashiers = {};
+
     sales.forEach((sale) => {
+      const amount = parseFloat(sale.total_amount || 0);
+      totalRevenue += amount;
+      totalVAT += parseFloat(sale.vat_total || 0);
+      totalDiscounts += parseFloat(sale.discount_amount || 0);
+
+      // Calculate buying and selling prices from items
+      if (sale.items) {
+        sale.items.forEach((item) => {
+          const quantity = parseInt(item.quantity || 0);
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const buyingPrice = parseFloat(item.product?.buying_price || 0);
+
+          totalSellingPrice += quantity * unitPrice;
+          totalBuyingPrice += quantity * buyingPrice;
+        });
+      }
+
+      // Daily revenue - FIXED: handle both Date objects and strings
+      let dateStr;
+      if (sale.created_at instanceof Date) {
+        dateStr = sale.created_at.toISOString().split("T")[0];
+      } else if (typeof sale.created_at === "string") {
+        dateStr = sale.created_at.split("T")[0];
+      } else {
+        dateStr = new Date(sale.created_at).toISOString().split("T")[0];
+      }
+
+      if (!dailyRevenue[dateStr]) {
+        dailyRevenue[dateStr] = 0;
+      }
+      dailyRevenue[dateStr] += amount;
+
+      // Top cashiers
       const name = sale.user?.full_name || "Unknown";
       if (!topCashiers[name]) {
         topCashiers[name] = {
+          name,
           transactions: 0,
           revenue: 0,
+          profit: 0,
         };
       }
       topCashiers[name].transactions += 1;
-      topCashiers[name].revenue += parseFloat(sale.total_amount || 0);
+      topCashiers[name].revenue += amount;
+
+      // Calculate cashier profit
+      if (sale.items) {
+        sale.items.forEach((item) => {
+          const quantity = parseInt(item.quantity || 0);
+          const unitPrice = parseFloat(item.unit_price || 0);
+          const buyingPrice = parseFloat(item.product?.buying_price || 0);
+          topCashiers[name].profit += (unitPrice - buyingPrice) * quantity;
+        });
+      }
     });
+
+    // Calculate total profit
+    totalProfit = totalSellingPrice - totalBuyingPrice;
 
     const reportData = {
       type: "financial",
       name: reportName || `Financial Report ${from} to ${to}`,
       dateRange: dateRange,
+      timeRange: startTime && endTime ? { startTime, endTime } : null,
       generated_at: new Date().toISOString(),
       summary: {
         total_revenue: totalRevenue,
@@ -281,6 +347,14 @@ export const generateFinancialReport = async (req, res) => {
         total_transactions: totalTransactions,
         average_transaction:
           totalTransactions > 0 ? totalRevenue / totalTransactions : 0,
+
+        // New profit metrics
+        total_buying_price: totalBuyingPrice,
+        total_selling_price: totalSellingPrice,
+        total_profit: totalProfit,
+        profit_margin:
+          totalSellingPrice > 0 ? (totalProfit / totalSellingPrice) * 100 : 0,
+
         daily_revenue: dailyRevenue,
         top_cashiers: Object.entries(topCashiers)
           .map(([name, data]) => ({ name, ...data }))
@@ -290,21 +364,33 @@ export const generateFinancialReport = async (req, res) => {
       data: sales,
     };
 
+    // Create the report with combined date-time fields
     const report = await Report.create({
       report_type: "financial",
       report_name: reportData.name,
       generated_by: req.user.id,
-      date_range_from: from,
-      date_range_to: to,
-      parameters: { ...req.body },
+      date_range_from: fromDateTime, // Full timestamp with time
+      date_range_to: toDateTime, // Full timestamp with time
+      parameters: {
+        ...req.body,
+        fromDateTime: fromDateTime.toISOString(),
+        toDateTime: toDateTime.toISOString(),
+      },
       summary: reportData.summary,
       status: "generated",
     });
+    // Include time info in response
+    const responseData = {
+      ...reportData,
+      report_id: report.id,
+      fromDateTime: fromDateTime.toISOString(),
+      toDateTime: toDateTime.toISOString(),
+    };
 
     res.json({
       success: true,
       message: "Financial report generated successfully",
-      data: { ...reportData, report_id: report.id },
+      data: responseData,
     });
   } catch (error) {
     console.error("Error generating financial report:", error);
@@ -315,7 +401,6 @@ export const generateFinancialReport = async (req, res) => {
     });
   }
 };
-
 // Generate Customer Report
 export const generateCustomerReport = async (req, res) => {
   try {
@@ -388,8 +473,8 @@ export const generateCustomerReport = async (req, res) => {
       report_type: "customer",
       report_name: reportData.name,
       generated_by: req.user.id,
-      date_range_from: from,
-      date_range_to: to,
+      date_range_from: fromDateTime,
+      date_range_to: toDateTime || null,
       parameters: { ...req.body },
       summary: reportData.summary,
       status: "generated",
@@ -624,9 +709,23 @@ export const getAllReports = async (req, res) => {
       ],
     });
 
+    // Format dates before sending
+    const formattedReports = reports.rows.map((report) => {
+      const plain = report.toJSON();
+      return {
+        ...plain,
+        date_range_from: plain.date_range_from
+          ? new Date(plain.date_range_from).toISOString()
+          : null,
+        date_range_to: plain.date_range_to
+          ? new Date(plain.date_range_to).toISOString()
+          : null,
+      };
+    });
+
     res.json({
       success: true,
-      data: reports.rows,
+      data: formattedReports,
       total: reports.count,
       limit: parseInt(limit),
       offset: parseInt(offset),

@@ -43,6 +43,7 @@ const allowedOrigins = [
   "https://market-frontend-olive.vercel.app",
   "http://localhost:8888", // For local development
   "http://localhost:3000", // For Vite development
+  `http://localhost:3001`, // For local development
   `http://${localIpAddress}:3000`, // For Vite development
   `http://${localIpAddress}:8888`, // For local development
   "https://bitter-breeze-52de.rwandamasteryhub2024.workers.dev/",

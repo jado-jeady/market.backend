@@ -35,11 +35,11 @@ Report.init(
       },
     },
     date_range_from: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: false,
     },
     date_range_to: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATE,
       allowNull: false,
     },
     file_path: {
