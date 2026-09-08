@@ -120,7 +120,10 @@ export const getRandomOpenShift = async (req, res) => {
 /* ================= GET ALL SHIFTS ONLY ================= */
 export const getAllOnlyShifts = async (req, res) => {
   try {
-    const shifts = await Shift.findAll({ order: [["created_at", "DESC"]] });
+    const shifts = await Shift.findAll({
+      order: [["created_at", "DESC"]],
+      limit: 10, // Limit to the last 10 shifts
+    });
     return res.json({ success: true, data: shifts });
   } catch (error) {
     console.error("Get all shifts error:", error);
