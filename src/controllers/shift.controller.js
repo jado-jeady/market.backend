@@ -121,9 +121,16 @@ export const getRandomOpenShift = async (req, res) => {
 export const getAllOnlyShifts = async (req, res) => {
   try {
     const shifts = await Shift.findAll({
-      order: [["created_at", "DESC"]],
-      limit: 10, // Limit to the last 10 shifts
+      // 1. Exclude the heavy snapshot to reduce payload size and CPU usage
+      attributes: { exclude: ["consumables_snapshot"] },
+      // 2. Ensure "createdAt" is indexed in your DB migration
+      order: [["createdAt", "DESC"]],
+      limit: 10,
     });
+
+    // Set a Cache-Control header if data doesn't change every second
+    res.set("Cache-Control", "public, max-age=30");
+
     return res.json({ success: true, data: shifts });
   } catch (error) {
     console.error("Get all shifts error:", error);
