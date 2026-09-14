@@ -2,7 +2,7 @@ import db from "../models/index.js";
 import { Sequelize, Op } from "sequelize";
 import sequelize from "../config/database.js";
 
-const { SaleItem, Product, Return, User, Sale } = db;
+const { SaleItem, Product, Return, User, Sale, ProductBatch } = db;
 
 /* ==================HANDLING A RETURN SALE====================*/
 export const createReturn = async (req, res) => {
@@ -234,43 +234,104 @@ const updateSaleStatus = async (sale_id) => {
 
 // Approve return
 export const approveReturn = async (req, res) => {
+  const transaction = await db.sequelize.transaction();
   try {
     const { id } = req.params;
     const { approved_by } = req.body;
 
     const returnRecord = await Return.findByPk(id, {
       include: [{ model: Sale, include: [SaleItem] }],
+      transaction,
     });
 
     if (!returnRecord) {
+      await transaction.rollback();
       return res.status(404).json({ error: "Return not found" });
     }
 
     if (returnRecord.status !== "PENDING") {
+      await transaction.rollback();
       return res.status(400).json({ error: "Return is already processed" });
+    }
+
+    // Find the original sale item to get its batch_id
+    const originalSaleItem = await SaleItem.findOne({
+      where: {
+        sale_id: returnRecord.sale_id,
+        product_id: returnRecord.product_id,
+      },
+      transaction,
+    });
+
+    if (!originalSaleItem) {
+      await transaction.rollback();
+      return res.status(400).json({ error: "Original sale item not found" });
+    }
+
+    //  Restore stock into the SAME batch it was sold from
+    const product = await Product.findByPk(returnRecord.product_id, {
+      transaction,
+    });
+    if (product && product.track_stock) {
+      if (originalSaleItem.batch_id) {
+        // Preferred path: restore to same batch
+        const batch = await ProductBatch.findByPk(originalSaleItem.batch_id, {
+          transaction,
+        });
+        if (batch) {
+          await batch.addStock(
+            returnRecord.quantity,
+            approved_by,
+            `Return #${returnRecord.id} for sale #${returnRecord.sale_id}`,
+            transaction,
+          );
+        }
+      } else {
+        // Old sale without batch: create a new "RETURN" batch
+        const newBatch = await ProductBatch.create(
+          {
+            product_id: product.id,
+            batch_code: `RET-${returnRecord.id}-${Date.now()}`,
+            buying_price:
+              originalSaleItem.buying_price || product.buying_price || 0,
+            selling_price: originalSaleItem.unit_price || product.selling_price,
+            stock_quantity: 0,
+            is_active: true,
+          },
+          { transaction },
+        );
+
+        await newBatch.addStock(
+          returnRecord.quantity,
+          approved_by,
+          `Return #${returnRecord.id} (pre-batch sale, new batch created)`,
+          transaction,
+        );
+      }
+
+      // Sync cached product stock
+      const totalStock = await ProductBatch.sum("stock_quantity", {
+        where: { product_id: product.id },
+        transaction,
+      });
+      await product.update(
+        { stock_quantity: totalStock || 0 },
+        { transaction },
+      );
     }
 
     // Update return status
     returnRecord.status = "APPROVED";
     returnRecord.approved_by = approved_by;
     returnRecord.approved_at = new Date();
-    await returnRecord.save();
+    await returnRecord.save({ transaction });
 
-    // Update product stock (add back the refunded quantity)
-    const product = await Product.findByPk(returnRecord.product_id);
-    if (product) {
-      product.stock_quantity =
-        (product.stock_quantity || 0) + returnRecord.quantity;
-      await product.save();
-    }
-
-    // Update sale totals and mark items as refunded
+    // Update sale totals + status (existing helpers)
     await updateSaleTotals(returnRecord.sale_id);
-
-    // Update sale status
     await updateSaleStatus(returnRecord.sale_id);
 
-    // Fetch the updated return with all details
+    await transaction.commit();
+
     const updatedReturn = await Return.findByPk(id, {
       include: [
         { model: Product, attributes: ["id", "name", "stock_quantity"] },
@@ -286,11 +347,11 @@ export const approveReturn = async (req, res) => {
       return: updatedReturn,
     });
   } catch (err) {
+    await transaction.rollback();
     console.error("Error approving return:", err);
     res.status(500).json({ error: "Failed to approve return" });
   }
 };
-
 // Reject return
 export const rejectReturn = async (req, res) => {
   try {
@@ -329,59 +390,104 @@ export const rejectReturn = async (req, res) => {
 
 // Bulk approve multiple returns for a sale
 export const bulkApproveReturns = async (req, res) => {
+  const transaction = await db.sequelize.transaction();
   try {
     const { sale_id, return_ids, approved_by } = req.body;
 
     if (!sale_id || !return_ids || return_ids.length === 0) {
-      return res
-        .status(400)
-        .json({ error: "Sale ID and return IDs are required" });
+      await transaction.rollback();
+      return res.status(400).json({ error: "Sale ID and return IDs required" });
     }
 
     const returns = await Return.findAll({
-      where: {
-        id: return_ids,
-        sale_id: sale_id,
-        status: "PENDING",
-      },
+      where: { id: return_ids, sale_id, status: "PENDING" },
+      transaction,
     });
 
     if (returns.length === 0) {
+      await transaction.rollback();
       return res.status(404).json({ error: "No pending returns found" });
     }
 
-    // Approve all returns
     for (const returnRecord of returns) {
+      const originalSaleItem = await SaleItem.findOne({
+        where: {
+          sale_id: returnRecord.sale_id,
+          product_id: returnRecord.product_id,
+        },
+        transaction,
+      });
+
+      const product = await Product.findByPk(returnRecord.product_id, {
+        transaction,
+      });
+
+      if (product && product.track_stock) {
+        if (originalSaleItem?.batch_id) {
+          const batch = await ProductBatch.findByPk(originalSaleItem.batch_id, {
+            transaction,
+          });
+          if (batch) {
+            await batch.addStock(
+              returnRecord.quantity,
+              approved_by,
+              `Return #${returnRecord.id} (bulk)`,
+              transaction,
+            );
+          }
+        } else {
+          const newBatch = await ProductBatch.create(
+            {
+              product_id: product.id,
+              batch_code: `RET-${returnRecord.id}-${Date.now()}`,
+              buying_price:
+                originalSaleItem?.buying_price || product.buying_price || 0,
+              selling_price:
+                originalSaleItem?.unit_price || product.selling_price,
+              stock_quantity: 0,
+              is_active: true,
+            },
+            { transaction },
+          );
+          await newBatch.addStock(
+            returnRecord.quantity,
+            approved_by,
+            `Return #${returnRecord.id} (bulk, pre-batch sale)`,
+            transaction,
+          );
+        }
+
+        const totalStock = await ProductBatch.sum("stock_quantity", {
+          where: { product_id: product.id },
+          transaction,
+        });
+        await product.update(
+          { stock_quantity: totalStock || 0 },
+          { transaction },
+        );
+      }
+
       returnRecord.status = "APPROVED";
       returnRecord.approved_by = approved_by;
       returnRecord.approved_at = new Date();
-      await returnRecord.save();
-
-      // Update product stock for each
-      const product = await Product.findByPk(returnRecord.product_id);
-      if (product) {
-        product.stock_quantity =
-          (product.stock_quantity || 0) + returnRecord.quantity;
-        await product.save();
-      }
+      await returnRecord.save({ transaction });
     }
 
-    // Update sale totals
     await updateSaleTotals(sale_id);
-
-    // Update sale status
     await updateSaleStatus(sale_id);
+
+    await transaction.commit();
 
     res.json({
       message: `${returns.length} returns approved successfully`,
       count: returns.length,
     });
   } catch (err) {
+    await transaction.rollback();
     console.error("Error bulk approving returns:", err);
     res.status(500).json({ error: "Failed to bulk approve returns" });
   }
 };
-
 // ========================== GETTING RETURNS BY CASHIER =============================
 export const getReturnsByCashier = async (req, res) => {
   try {

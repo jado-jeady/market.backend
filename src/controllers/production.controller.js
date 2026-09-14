@@ -3,8 +3,15 @@ import { Op } from "sequelize";
 import { getIO } from "../utils/socket.js";
 import { createNotification } from "./notifications.controller.js";
 
-const { Production, ProductionItem, Product, User, sequelize, Notification } =
-  db;
+const {
+  Production,
+  ProductBatch,
+  ProductionItem,
+  Product,
+  User,
+  sequelize,
+  Notification,
+} = db;
 
 /* =========================================================
    1️⃣ STOREKEEPER - SUBMIT PRODUCTION (PENDING)
@@ -108,11 +115,41 @@ export const approveProduction = async (req, res, next) => {
 
     await sequelize.transaction(async (t) => {
       for (const item of production.items) {
-        const product = await Product.findByPk(item.product_id);
+        const product = await Product.findByPk(item.product_id, {
+          transaction: t,
+        });
 
-        if (product.track_stock) {
-          product.stock_quantity += item.quantity;
-          await product.save({ transaction: t });
+        if (product && product.track_stock) {
+          // ⭐ Create a new batch for the produced quantity
+          const newBatch = await ProductBatch.create(
+            {
+              product_id: product.id,
+              batch_code: `PROD-${production.id}-${product.sku || product.id}-${Date.now()}`,
+              buying_price: product.buying_price || 0,
+              selling_price: product.selling_price,
+              stock_quantity: 0,
+              is_active: true,
+            },
+            { transaction: t },
+          );
+
+          // Add stock via the batch (auto-logs stock_adjustment)
+          await newBatch.addStock(
+            item.quantity,
+            req.user.id,
+            `Production #${production.id} approved`,
+            t,
+          );
+
+          // Sync cached product stock
+          const totalStock = await ProductBatch.sum("stock_quantity", {
+            where: { product_id: product.id },
+            transaction: t,
+          });
+          await product.update(
+            { stock_quantity: totalStock || 0 },
+            { transaction: t },
+          );
         }
       }
 

@@ -11,55 +11,41 @@ export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
 
   try {
-    const errors = validationResult(req.body);
-
+    // 🐛 FIXED: was validationResult(req.body) — should be req
+    const errors = validationResult(req);
     if (!errors.isEmpty()) {
       await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        errors: errors.array(),
-      });
+      return res.status(400).json({ success: false, errors: errors.array() });
     }
 
     const { saleType, items, payment_method, customer_id } = req.body;
     const userId = req.user.id;
 
-    // Generate invoice number (YYYYMMDD-XXXXX)
+    // Invoice number generation (unchanged logic)
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, "");
     const lastSale = await Sale.findOne({
-      where: {
-        invoice_number: {
-          [Sequelize.Op.like]: `${dateStr}-%`,
-        },
-      },
+      where: { invoice_number: { [Sequelize.Op.like]: `${dateStr}-%` } },
       order: [["invoice_number", "DESC"]],
       transaction,
     });
-
-    let sequence = 1;
-    if (lastSale) {
-      const lastSeq = parseInt(lastSale.invoice_number.slice(-5));
-      sequence = lastSeq + 1;
-    }
+    let sequence = lastSale
+      ? parseInt(lastSale.invoice_number.slice(-5)) + 1
+      : 1;
     const invoiceNumber = `${dateStr}-${sequence.toString().padStart(5, "0")}`;
 
-    // Validate and process items
+    const isBarista = saleType === "baristaSales" || saleType === "baristaSale";
+
     let subtotal = 0;
     let vatTotal = 0;
     const saleItems = [];
 
-    // If this is a barista sale, use the provided items directly and skip stock checks/updates
-    const isBarista = saleType === "baristaSales" || saleType === "baristaSale";
-
     for (const item of items) {
+      // ============ BARISTA: no stock, no batches ============
       if (isBarista) {
-        // Expect item to have: product_id (optional), name, price, quantity
         const quantity = Number(item.quantity) || 1;
         const unitPrice = parseFloat(item.price) || 0;
         const totalPrice = unitPrice * quantity;
-
-        // For barista sales we assume no VAT or use provided vat if present
         const vatAmount = item.vat_amount ? parseFloat(item.vat_amount) : 0;
 
         subtotal += totalPrice;
@@ -75,51 +61,38 @@ export const createSale = async (req, res, next) => {
           total_price: totalPrice,
           with_bottle: item.with_bottle || false,
           bottle_price: parseFloat(item.bottle_price) || 0,
+          batch_id: null,
+          buying_price: 0,
+          profit_margin: 0,
         });
+        continue;
+      }
 
-        // NOTE: intentionally do NOT update product stock for barista sales
-      } else {
-        // Regular sale: fetch product, validate stock and active status, update stock
-        const product = await Product.findByPk(item.product_id, {
-          transaction,
+      // ============ REGULAR PRODUCT SALE ============
+      const product = await Product.findByPk(item.product_id, { transaction });
+
+      if (!product) {
+        await transaction.rollback();
+        return res.status(404).json({
+          success: false,
+          message: `Product with ID ${item.product_id} not found`,
         });
+      }
 
-        if (!product) {
-          await transaction.rollback();
-          return res.status(404).json({
-            success: false,
-            message: `Product with ID ${item.product_id} not found`,
-          });
-        }
+      if (!product.is_active) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Product ${product.name} is not active`,
+        });
+      }
 
-        if (product.stock_quantity < item.quantity) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${product.name}. Available: ${product.stock_quantity}`,
-          });
-        }
-
-        if (!product.is_active) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: `Product ${product.name} is not active`,
-          });
-        }
-
-        // Calculate item totals
-        const unitPrice = item.with_bottle
-          ? parseFloat(product.selling_price) +
-            (parseFloat(item.bottle_price) || 0)
-          : parseFloat(product.selling_price);
+      // Products that don't track stock (services): no batches
+      if (!product.track_stock) {
+        const unitPrice = parseFloat(product.selling_price);
         const totalPrice = unitPrice * item.quantity;
-
-        // Calculate VAT based on product VAT category
-        let vatAmount = 0;
-        if (product.vat_category === "STANDARD") {
-          vatAmount = totalPrice * 0.18;
-        }
+        const vatAmount =
+          product.vat_category === "STANDARD" ? totalPrice * 0.18 : 0;
 
         subtotal += totalPrice;
         vatTotal += vatAmount;
@@ -128,29 +101,109 @@ export const createSale = async (req, res, next) => {
           product_id: product.id,
           quantity: item.quantity,
           unit_price: unitPrice,
-          product_name: item.with_bottle
-            ? `${product.name} (+ Bottle)`
-            : product.name,
+          product_name: product.name,
           barcode: product.barcode,
           vat_amount: vatAmount,
           total_price: totalPrice,
           with_bottle: item.with_bottle || false,
           bottle_price: parseFloat(item.bottle_price) || 0,
+          batch_id: null,
+          buying_price: 0,
+          profit_margin: 0,
+        });
+        continue;
+      }
+
+      // ⭐ FIFO: oldest expiring batch first
+      const batches = await ProductBatch.findAll({
+        where: {
+          product_id: product.id,
+          is_active: true,
+          stock_quantity: { [Op.gt]: 0 },
+        },
+        order: [
+          ["expire_date", "ASC NULLS LAST"],
+          ["received_date", "ASC"],
+        ],
+        transaction,
+        lock: transaction.LOCK.UPDATE,
+      });
+
+      if (batches.length === 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `No stock available for ${product.name}`,
+        });
+      }
+
+      let remainingQty = item.quantity;
+      const bottlePrice = parseFloat(item.bottle_price) || 0;
+
+      for (const batch of batches) {
+        if (remainingQty <= 0) break;
+
+        const take = Math.min(remainingQty, batch.stock_quantity);
+        const unitPrice =
+          parseFloat(batch.selling_price) +
+          (item.with_bottle ? bottlePrice : 0);
+        const buyingPrice = parseFloat(batch.buying_price);
+        const lineTotal = unitPrice * take;
+        const lineCost = buyingPrice * take;
+        const vatAmount =
+          product.vat_category === "STANDARD" ? lineTotal * 0.18 : 0;
+
+        // Consume from batch + auto-log stock_adjustment
+        await batch.consumeForSale(
+          take,
+          userId,
+          `Sale #${invoiceNumber}`,
+          transaction,
+        );
+
+        saleItems.push({
+          product_id: product.id,
+          batch_id: batch.id,
+          quantity: take,
+          unit_price: unitPrice,
+          buying_price: buyingPrice,
+          profit_margin: lineTotal - lineCost,
+          product_name: item.with_bottle
+            ? `${product.name} (+ Bottle)`
+            : product.name,
+          barcode: product.barcode,
+          vat_amount: vatAmount,
+          total_price: lineTotal,
+          with_bottle: item.with_bottle || false,
+          bottle_price: bottlePrice,
         });
 
-        // Update product stock
-        await product.update(
-          {
-            stock_quantity: product.stock_quantity - item.quantity,
-          },
-          { transaction },
-        );
+        subtotal += lineTotal;
+        vatTotal += vatAmount;
+        remainingQty -= take;
       }
+
+      if (remainingQty > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for ${product.name}`,
+        });
+      }
+
+      // Sync cached total on product
+      const totalStock = await ProductBatch.sum("stock_quantity", {
+        where: { product_id: product.id },
+        transaction,
+      });
+      await product.update(
+        { stock_quantity: totalStock || 0 },
+        { transaction },
+      );
     }
 
     const totalAmount = subtotal + vatTotal;
 
-    // Create sale (include saleType if you want to store it)
     const sale = await Sale.create(
       {
         invoice_number: invoiceNumber,
@@ -169,7 +222,6 @@ export const createSale = async (req, res, next) => {
       { transaction },
     );
 
-    // Create sale items
     const saleItemsWithSaleId = saleItems.map((item) => ({
       ...item,
       sale_id: sale.id,
@@ -177,10 +229,8 @@ export const createSale = async (req, res, next) => {
 
     await SaleItem.bulkCreate(saleItemsWithSaleId, { transaction });
 
-    // Commit transaction
     await transaction.commit();
 
-    // Get sale with details
     const saleWithDetails = await Sale.findByPk(sale.id, {
       include: [
         {
@@ -196,6 +246,11 @@ export const createSale = async (req, res, next) => {
               model: Product,
               as: "product",
               attributes: ["id", "name", "barcode", "vat_category"],
+            },
+            {
+              model: ProductBatch,
+              as: "batch",
+              attributes: ["id", "batch_code", "buying_price", "selling_price"],
             },
           ],
         },

@@ -2,7 +2,7 @@ import db from "../models/index.js";
 import { Op, where } from "sequelize";
 import { validationResult } from "express-validator";
 import sequelize from "../config/database.js";
-const { Product, Category, SaleItem, User, PriceChange } = db;
+const { Product, Category, SaleItem, User, PriceChange, ProductBatch } = db;
 
 /* =====================================================
    GET ALL PRODUCTS (WITH FILTERS + PAGINATION)
@@ -220,6 +220,20 @@ export const createProduct = async (req, res, next) => {
         };
 
     const product = await Product.create(productData);
+
+    // If product tracks stock and has initial qty, create its first batch
+    if (product.track_stock && product.stock_quantity > 0) {
+      await ProductBatch.create({
+        product_id: product.id,
+        batch_code: `INIT-${product.sku || product.id}-${Date.now()}`,
+        buying_price: parseFloat(buying_price || 0),
+        selling_price: parseFloat(selling_price),
+        stock_quantity: parseInt(stock_quantity || 0),
+        expire_date: expire_date || null,
+        received_date: new Date(),
+        is_active: true,
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -667,5 +681,118 @@ export const getAllPriceChanges = async (req, res) => {
       success: false,
       message: "Failed to fetch price changes",
     });
+  }
+};
+
+/* =====================================================
+   GET ALL BATCHES FOR A PRODUCT
+===================================================== */
+export const getProductBatches = async (req, res, next) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    const batches = await ProductBatch.findAll({
+      where: { product_id: req.params.id },
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.json({ success: true, data: batches });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* =====================================================
+   RECEIVE NEW STOCK (create a new batch)
+===================================================== */
+export const receiveStock = async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+  try {
+    const { product_id, quantity, buying_price, selling_price, expire_date } =
+      req.body;
+    const user_id = req.user.id;
+
+    const product = await Product.findByPk(product_id, { transaction });
+    if (!product) {
+      await transaction.rollback();
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    if (!product.track_stock) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Product does not track stock",
+      });
+    }
+
+    const batchCode = `${product.sku || product.id}-${Date.now()}`;
+
+    const batch = await ProductBatch.create(
+      {
+        product_id: product.id,
+        batch_code: batchCode,
+        buying_price: parseFloat(buying_price),
+        selling_price: parseFloat(selling_price),
+        stock_quantity: 0,
+        expire_date: expire_date || null,
+        received_date: new Date(),
+        is_active: true,
+      },
+      { transaction },
+    );
+
+    await batch.addStock(
+      parseInt(quantity),
+      user_id,
+      `New batch received: ${batchCode}`,
+      transaction,
+    );
+
+    // Log price change if selling price differs
+    const oldPrice = parseFloat(product.selling_price);
+    const newPrice = parseFloat(selling_price);
+    if (oldPrice !== newPrice) {
+      await PriceChange.create(
+        {
+          product_id: product.id,
+          old_price: oldPrice,
+          new_price: newPrice,
+          price_difference: newPrice - oldPrice,
+          changed_by: user_id,
+          change_reason: `New batch ${batchCode} with updated pricing`,
+          change_type: newPrice > oldPrice ? "INCREASE" : "DECREASE",
+          affected_batch_id: batch.id,
+        },
+        { transaction },
+      );
+    }
+
+    // Sync cached total + update product defaults
+    const totalStock = await ProductBatch.sum("stock_quantity", {
+      where: { product_id: product.id },
+      transaction,
+    });
+    await product.update(
+      {
+        stock_quantity: totalStock || 0,
+        buying_price,
+        selling_price,
+      },
+      { transaction },
+    );
+
+    await transaction.commit();
+    return res.status(201).json({ success: true, data: batch });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
 };
