@@ -50,6 +50,11 @@ PriceChange.init(
       type: DataTypes.ENUM("INCREASE", "DECREASE", "UPDATE"),
       allowNull: false,
     },
+    affected_batch_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Which batch was affected (null for product-wide changes)",
+    },
     created_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,

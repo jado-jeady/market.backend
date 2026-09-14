@@ -51,6 +51,18 @@ StockAdjustment.init(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    batch_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment:
+        "Which batch this adjustment affected. Null for pre-batch adjustments.",
+    },
+
+    batch_code: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: "Batch code at time of adjustment",
+    },
   },
   {
     sequelize,
