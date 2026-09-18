@@ -2,7 +2,7 @@ import db from "../models/index.js";
 import { Op, where } from "sequelize";
 import { validationResult } from "express-validator";
 import sequelize from "../config/database.js";
-const { Product, Category, SaleItem, User, PriceChange } = db;
+const { Product, Category, SaleItem, User, PriceChange, ProductBatch } = db;
 
 /* =====================================================
    GET ALL PRODUCTS (WITH FILTERS + PAGINATION)
@@ -25,9 +25,8 @@ export const getAllProducts = async (req, res, next) => {
     const where = {
       product_type: ["NORMAL", "Consumable", "Service"],
       is_active: true,
-    }; // default filter to show only normal products, active, non-barista items and active products
+    };
 
-    /* 🔎 SEARCH */
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
@@ -35,31 +34,24 @@ export const getAllProducts = async (req, res, next) => {
       ];
     }
 
-    /* 📂 CATEGORY FILTER */
     if (category_id && category_id !== "all") {
       where.category_id = category_id;
     }
 
-    /* 🧃 PRODUCT TYPE FILTER */
     if (product_type) {
       where.product_type = product_type;
     }
 
-    /* 📉 LOW STOCK */
     if (low_stock === "true") {
       where.stock_quantity = {
         [Op.lte]: Product.sequelize.col("min_stock"),
       };
     }
 
-    //out of stock
     if (out_of_stock === "true") {
-      where.stock_quantity = {
-        [Op.lte]: 0,
-      };
+      where.stock_quantity = { [Op.lte]: 0 };
     }
 
-    /* 🟢 ACTIVE FILTER */
     if (is_active !== undefined) {
       where.is_active = is_active === "true";
     } else {
@@ -71,18 +63,71 @@ export const getAllProducts = async (req, res, next) => {
       limit,
       offset,
       order: [["created_at", "DESC"]],
+      distinct: true,
       include: [
         {
           model: Category,
           as: "category",
           attributes: ["id", "name"],
         },
+        {
+          model: ProductBatch,
+          as: "batches",
+          attributes: [
+            "id",
+            "batch_code",
+            "buying_price",
+            "selling_price",
+            "stock_quantity",
+            "expire_date",
+            "received_date",
+            "is_active",
+          ],
+          required: false,
+          // Only pull active batches (we filter out zero-stock in JS)
+          where: { is_active: true },
+        },
       ],
+    });
+
+    // ⭐ Compute current shelf price from newest active batch
+    const productsWithBatchPricing = rows.map((product) => {
+      const plain = product.toJSON();
+
+      // Filter to batches with actual stock
+      const activeBatches = (plain.batches || []).filter(
+        (b) => b.stock_quantity > 0,
+      );
+
+      // Newest batch wins for display price
+      const newestBatch = activeBatches.sort(
+        (a, b) => new Date(b.received_date) - new Date(a.received_date),
+      )[0];
+
+      return {
+        ...plain,
+        // Always overwrite selling_price / buying_price so existing UI works unchanged
+        selling_price: newestBatch
+          ? newestBatch.selling_price
+          : plain.selling_price,
+        buying_price: newestBatch
+          ? newestBatch.buying_price
+          : plain.buying_price,
+        //  bonus: expose batch info for whoever needs it
+        current_batch_id: newestBatch?.id || null,
+        current_batch_code: newestBatch?.batch_code || null,
+        current_batch_expiry: newestBatch?.expire_date || null,
+        active_batches_count: activeBatches.length,
+        total_batch_stock: activeBatches.reduce(
+          (sum, b) => sum + b.stock_quantity,
+          0,
+        ),
+      };
     });
 
     return res.json({
       success: true,
-      data: rows,
+      data: productsWithBatchPricing,
       pagination: {
         total: count,
         page,
@@ -96,6 +141,37 @@ export const getAllProducts = async (req, res, next) => {
   }
 };
 
+// helper fucntions
+/**
+ * Take a product (with batches already included) and return a plain object
+ * with the newest active batch's price as selling_price/buying_price.
+ */
+const applyBatchPricing = (productInstance) => {
+  const plain = productInstance.toJSON();
+  const activeBatches = (plain.batches || []).filter(
+    (b) => b.stock_quantity > 0,
+  );
+  const newestBatch = activeBatches.sort(
+    (a, b) => new Date(b.received_date) - new Date(a.received_date),
+  )[0];
+
+  return {
+    ...plain,
+    selling_price: newestBatch
+      ? newestBatch.selling_price
+      : plain.selling_price,
+    buying_price: newestBatch ? newestBatch.buying_price : plain.buying_price,
+    current_batch_id: newestBatch?.id || null,
+    current_batch_code: newestBatch?.batch_code || null,
+    current_batch_expiry: newestBatch?.expire_date || null,
+    active_batches_count: activeBatches.length,
+    total_batch_stock: activeBatches.reduce(
+      (sum, b) => sum + b.stock_quantity,
+      0,
+    ),
+  };
+};
+
 /* =====================================================
    GET PRODUCT BY ID
 ===================================================== */
@@ -103,10 +179,12 @@ export const getProductById = async (req, res, next) => {
   try {
     const product = await Product.findByPk(req.params.id, {
       include: [
+        { model: Category, as: "category", attributes: ["id", "name"] },
         {
-          model: Category,
-          as: "category",
-          attributes: ["id", "name"],
+          model: ProductBatch,
+          as: "batches",
+          where: { is_active: true },
+          required: false,
         },
       ],
     });
@@ -118,7 +196,7 @@ export const getProductById = async (req, res, next) => {
       });
     }
 
-    res.json({ success: true, data: product });
+    res.json({ success: true, data: applyBatchPricing(product) });
   } catch (error) {
     next(error);
   }
@@ -220,6 +298,20 @@ export const createProduct = async (req, res, next) => {
         };
 
     const product = await Product.create(productData);
+
+    // If product tracks stock and has initial qty, create its first batch
+    if (product.track_stock && product.stock_quantity > 0) {
+      await ProductBatch.create({
+        product_id: product.id,
+        batch_code: `INIT-${product.sku || product.id}-${Date.now()}`,
+        buying_price: parseFloat(buying_price || 0),
+        selling_price: parseFloat(selling_price),
+        stock_quantity: parseInt(stock_quantity || 0),
+        expire_date: expire_date || null,
+        received_date: new Date(),
+        is_active: true,
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -383,7 +475,7 @@ export const getAllBaristaItems = async (req, res, next) => {
 //       });
 //     }
 
-//     /* 🚫 Prevent duplicate barcode */
+//     /*  Prevent duplicate barcode */
 //     if (req.body.barcode && req.body.barcode !== product.barcode) {
 //       const exists = await Product.findOne({
 //         where: { barcode: req.body.barcode },
@@ -412,20 +504,17 @@ export const getAllBaristaItems = async (req, res, next) => {
 export const updateProduct = async (req, res, next) => {
   try {
     const product = await Product.findByPk(req.params.id);
-
     if (!product) {
       return res.status(404).json({
         success: false,
         message: "Product not found",
       });
     }
-
     // Prevent duplicate barcode
     if (req.body.barcode && req.body.barcode !== product.barcode) {
       const exists = await Product.findOne({
         where: { barcode: req.body.barcode },
       });
-
       if (exists) {
         return res.status(400).json({
           success: false,
@@ -433,7 +522,6 @@ export const updateProduct = async (req, res, next) => {
         });
       }
     }
-
     // Store old price for price change tracking
     const oldPrice = parseFloat(product.selling_price);
     const newPrice = req.body.selling_price
@@ -667,5 +755,202 @@ export const getAllPriceChanges = async (req, res) => {
       success: false,
       message: "Failed to fetch price changes",
     });
+  }
+};
+
+/* =====================================================
+   GET ALL BATCHES FOR A PRODUCT
+===================================================== */
+export const getProductBatches = async (req, res, next) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    const batches = await ProductBatch.findAll({
+      where: { product_id: req.params.id },
+      order: [["created_at", "DESC"]],
+    });
+
+    return res.json({ success: true, data: batches });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* =====================================================
+   RECEIVE NEW STOCK (create a new batch + sync prices)
+===================================================== */
+export const receiveStock = async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+  try {
+    const {
+      product_id,
+      quantity,
+      buying_price,
+      selling_price,
+      expire_date,
+      update_existing_batches = true, // default: auto-sync shelf price
+      change_reason,
+    } = req.body;
+
+    const user_id = req.user.id;
+
+    // ---- 1. Validate product ----
+    const product = await Product.findByPk(product_id, { transaction });
+    if (!product) {
+      await transaction.rollback();
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+
+    if (!product.track_stock) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Product does not track stock",
+      });
+    }
+
+    if (!buying_price || !selling_price) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "buying_price and selling_price are required",
+      });
+    }
+
+    const newBuying = parseFloat(buying_price);
+    const newSelling = parseFloat(selling_price);
+
+    // ---- 2. Create the new batch ----
+    const batchCode = `${product.sku || product.id}-${Date.now()}`;
+
+    const newBatch = await ProductBatch.create(
+      {
+        product_id: product.id,
+        batch_code: batchCode,
+        buying_price: newBuying,
+        selling_price: newSelling,
+        stock_quantity: 0,
+        expire_date: expire_date || null,
+        received_date: new Date(),
+        is_active: true,
+      },
+      { transaction },
+    );
+
+    // ---- 3. Add the incoming quantity (auto-logs stock_adjustment) ----
+    await newBatch.addStock(
+      parseInt(quantity),
+      user_id,
+      `New batch received: ${batchCode}`,
+      transaction,
+    );
+
+    // ---- 4. Auto-sync selling price on OTHER active batches ----
+    // If the new selling price differs from existing batches, update them
+    // AND log each change in price_changes for audit trail.
+    let updatedBatches = [];
+    if (update_existing_batches) {
+      const otherBatches = await ProductBatch.findAll({
+        where: {
+          product_id: product.id,
+          is_active: true,
+          stock_quantity: { [Op.gt]: 0 }, // only non-zero stock
+          id: { [Op.ne]: newBatch.id }, // exclude the new one
+        },
+        transaction,
+      });
+
+      for (const batch of otherBatches) {
+        const oldSelling = parseFloat(batch.selling_price);
+        if (oldSelling === newSelling) continue; // already same, skip
+
+        // Log the price change for this specific batch
+        await PriceChange.create(
+          {
+            product_id: product.id,
+            old_price: oldSelling,
+            new_price: newSelling,
+            price_difference: newSelling - oldSelling,
+            changed_by: user_id,
+            change_reason:
+              change_reason ||
+              `Auto-synced with new batch ${batchCode} (shelf price update)`,
+            change_type: newSelling > oldSelling ? "INCREASE" : "DECREASE",
+            affected_batch_id: batch.id,
+          },
+          { transaction },
+        );
+
+        // Update only the selling price (keep buying_price frozen)
+        await batch.update({ selling_price: newSelling }, { transaction });
+
+        updatedBatches.push({
+          batch_id: batch.id,
+          batch_code: batch.batch_code,
+          old_selling_price: oldSelling,
+          new_selling_price: newSelling,
+        });
+      }
+    }
+
+    // ---- 5. Update product cached stock + default prices ----
+    const totalStock = await ProductBatch.sum("stock_quantity", {
+      where: { product_id: product.id },
+      transaction,
+    });
+
+    await product.update(
+      {
+        stock_quantity: totalStock || 0,
+        buying_price: newBuying, // update default for future references
+        selling_price: newSelling, // update default for future references
+        supplier: req.body.supplier || product.supplier,
+      },
+      { transaction },
+    );
+
+    // ---- 6. Log product-level price change (in addition to batch-level) ----
+    const oldProductSelling = parseFloat(product.selling_price);
+    if (oldProductSelling !== newSelling) {
+      await PriceChange.create(
+        {
+          product_id: product.id,
+          old_price: oldProductSelling,
+          new_price: newSelling,
+          price_difference: newSelling - oldProductSelling,
+          changed_by: user_id,
+          change_reason:
+            change_reason ||
+            `Product shelf price updated via new batch ${batchCode}`,
+          change_type: newSelling > oldProductSelling ? "INCREASE" : "DECREASE",
+          affected_batch_id: newBatch.id, // reference the triggering batch
+        },
+        { transaction },
+      );
+    }
+
+    await transaction.commit();
+
+    return res.status(201).json({
+      success: true,
+      message: updatedBatches.length
+        ? `Batch received and ${updatedBatches.length} existing batch(es) price-synced`
+        : "Batch received",
+      data: {
+        new_batch: newBatch,
+        synced_batches: updatedBatches,
+        total_product_stock: totalStock,
+      },
+    });
+  } catch (error) {
+    await transaction.rollback();
+    next(error);
   }
 };

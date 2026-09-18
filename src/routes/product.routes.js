@@ -12,6 +12,8 @@ import {
   getProductPriceHistory,
   getPriceChangeSummary,
   getAllPriceChanges,
+  getProductBatches,
+  receiveStock,
 } from "../controllers/product.controller.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
 import { productValidation } from "../utils/validators.js";
@@ -27,6 +29,20 @@ router.get("/barcode/:barcode", getProductByBarcode);
 // Barista specific routes
 router.get("/barista-items", getAllBaristaItems);
 router.get("/barista-menu", getBaristaCategoriesProducts);
+
+// ⭐ Batch + stock receiving routes (must come before /:id)
+router.post(
+  "/receive-stock",
+  authenticate,
+  authorize("Admin", "Storekeeper"),
+  receiveStock,
+);
+router.get(
+  "/:id/batches",
+  authenticate,
+  authorize("Admin", "Storekeeper"),
+  getProductBatches,
+);
 
 // Public routes
 router.get("/:id", getProductById);
@@ -57,7 +73,6 @@ router.get("/price-changes/summary", authorize("Admin"), getPriceChangeSummary);
 router.get("/price-changes", authorize("Admin"), getAllPriceChanges);
 
 router.post("/", authorize("Admin"), productValidation, createProduct);
-router.put("/:id", authorize("Admin"), productValidation, updateProduct);
 router.delete("/:id", authorize("Admin"), deleteProduct);
 
 export default router;

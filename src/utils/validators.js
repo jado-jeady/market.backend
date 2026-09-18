@@ -49,6 +49,11 @@ export const saleValidation = [
     .isInt({ min: 1 })
     .withMessage("Valid quantity is required"),
   body("payment_method")
-    .isIn(["CASH", "MOMO", "CARD"])
+    .isIn(["cash", "momo", "card"])
     .withMessage("Valid payment method is required"),
+  body("shift_id")
+    .notEmpty()
+    .withMessage("Shift is required")
+    .isInt()
+    .withMessage("Valid shift ID is required"),
 ];

@@ -62,6 +62,24 @@ SaleItem.init(
       allowNull: true,
       defaultValue: 0.0,
     },
+    batch_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: "Which batch this item came from. Null for pre-batch sales.",
+    },
+
+    buying_price: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      comment:
+        "Frozen cost snapshot at time of sale. Null for pre-batch sales.",
+    },
+
+    profit_margin: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true,
+      comment: "(unit_price - buying_price) * quantity",
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: true,

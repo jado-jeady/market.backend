@@ -14,7 +14,7 @@ Return.init(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    Sale_item_id: {
+    sale_item_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },

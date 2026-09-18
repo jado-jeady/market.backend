@@ -15,6 +15,7 @@ import Damage from "./Damage.js";
 import Notification from "./Notification.js";
 import PriceChange from "./PriceChange.js";
 import Report from "./Reports.js";
+import ProductBatch from "./ProductBatch.js";
 
 // Define relationships
 
@@ -71,7 +72,7 @@ SaleItem.belongsTo(Sale, { foreignKey: "sale_id" });
 // Shift.belongsTo(User, { foreignKey: "id" });
 // User.hasMany(Shift, { foreignKey: "shift_id" });
 
-// Production ↔ ProductionItem
+// Production - ProductionItem
 Production.hasMany(ProductionItem, {
   foreignKey: "production_id",
   as: "items",
@@ -116,11 +117,11 @@ Shift.hasMany(Sale, { foreignKey: "shift_id", as: "sales" });
 // In Sale.js
 Sale.belongsTo(Shift, { foreignKey: "shift_id", as: "shift" });
 // shift to user relationship
-// Shift ↔ User (cashier)
+
 User.hasMany(Shift, { foreignKey: "cashier_id", as: "cashierShifts" });
 Shift.belongsTo(User, { foreignKey: "cashier_id", as: "cashier" });
 
-// Shift ↔ User (creator/owner)
+// Shift - User (creator/owner)
 User.hasMany(Shift, { foreignKey: "user_id", as: "createdShifts" });
 Shift.belongsTo(User, {
   foreignKey: "user_id",
@@ -130,23 +131,23 @@ Shift.belongsTo(User, {
 
 // ----------------------RETURNS Relationships ----------------
 
-// Sale ↔ SaleItem
+// Sale - SaleItem
 Sale.hasMany(SaleItem, { foreignKey: "sale_id" });
 SaleItem.belongsTo(Sale, { foreignKey: "sale_id" });
 
-// Product ↔ SaleItem
+// Product - SaleItem
 Product.hasMany(SaleItem, { foreignKey: "product_id" });
 SaleItem.belongsTo(Product, { foreignKey: "product_id" });
 
-// Sale ↔ Return
+// Sale - Return
 Sale.hasMany(Return, { foreignKey: "sale_id" });
 Return.belongsTo(Sale, { foreignKey: "sale_id" });
 
-// SaleItem ↔ Return (new link)
+// SaleItem - Return (new link)
 SaleItem.hasMany(Return, { foreignKey: "sale_item_id" });
 Return.belongsTo(SaleItem, { foreignKey: "sale_item_id" });
 
-// Product ↔ Return (optional, since SaleItem already links to Product)
+// Product - Return (optional, since SaleItem already links to Product)
 Product.hasMany(Return, { foreignKey: "product_id" });
 Return.belongsTo(Product, { foreignKey: "product_id" });
 
@@ -179,6 +180,24 @@ PriceChange.belongsTo(User, { foreignKey: "changed_by", as: "changedBy" });
 User.hasMany(Report, { foreignKey: "generated_by", as: "reports" });
 Report.belongsTo(User, { foreignKey: "generated_by", as: "generatedBy" });
 
+// Product - ProductBatch (One to Many)
+Product.hasMany(ProductBatch, { foreignKey: "product_id", as: "batches" });
+ProductBatch.belongsTo(Product, { foreignKey: "product_id", as: "product" });
+
+// ProductBatch - SaleItem (One to Many)
+ProductBatch.hasMany(SaleItem, { foreignKey: "batch_id", as: "sale_items" });
+SaleItem.belongsTo(ProductBatch, { foreignKey: "batch_id", as: "batch" });
+
+// ProductBatch - StockAdjustment (One to Many)
+ProductBatch.hasMany(StockAdjustment, {
+  foreignKey: "batch_id",
+  as: "adjustments",
+});
+StockAdjustment.belongsTo(ProductBatch, {
+  foreignKey: "batch_id",
+  as: "batch",
+});
+
 const db = {
   sequelize,
   User,
@@ -197,6 +216,7 @@ const db = {
   Notification,
   PriceChange,
   Report,
+  ProductBatch,
 };
 
 export default db;
