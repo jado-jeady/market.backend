@@ -4,6 +4,7 @@ import { Op } from "sequelize";
 const { Product, ProductBatch, StockAdjustment, User } = db;
 
 export const adjustStock = async (req, res) => {
+  console.log("adjustStock called with body:", req.body);
   const transaction = await db.sequelize.transaction();
   try {
     const { product_id, barcode, type, quantity, reason, batch_id } = req.body;

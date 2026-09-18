@@ -4,11 +4,12 @@ import { validationResult } from "express-validator";
 import { Sequelize, Op } from "sequelize";
 import sequelize from "../config/database.js";
 
-const { Sale, SaleItem, Product, Shift, User } = db;
+const { Sale, SaleItem, Product, Shift, User, ProductBatch } = db;
 
 // Create a new sale
 export const createSale = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
+  console.log("Starting transaction for createSale");
 
   try {
     // 🐛 FIXED: was validationResult(req.body) — should be req
@@ -256,13 +257,14 @@ export const createSale = async (req, res, next) => {
         },
       ],
     });
-
+    console.log("Sale created successfully:", saleWithDetails);
     res.status(201).json({
       success: true,
       message: "Sale completed successfully",
       data: saleWithDetails,
     });
   } catch (error) {
+    console.error("CreateSale error:", error);
     await transaction.rollback();
     next(error);
   }
@@ -551,6 +553,12 @@ export const getCashierSalesByashiftDate = async (req, res, next) => {
   try {
     const { business_date } = req.params;
     const cashierId = req.user.id; // Get the logged-in cashier's ID
+    console.log(
+      "Fetching sales for cashier ID:",
+      cashierId,
+      "on date:",
+      business_date,
+    );
 
     // If no date provided, default to today
     let dbDate;

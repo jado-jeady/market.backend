@@ -19,7 +19,7 @@ export const createReturn = async (req, res) => {
         where: {
           sale_id,
           product_id: item.product_id,
-          Sale_item_id: item.sale_item_id,
+          sale_item_id: item.sale_item_id,
           status: ["PENDING", "APPROVED"], // check both
         },
       });
@@ -47,7 +47,7 @@ export const createReturn = async (req, res) => {
           quantity: item.quantity,
           reason: item.reason,
           requested_by,
-          Sale_item_id: item.sale_item_id,
+          sale_item_id: item.sale_item_id,
           status: "PENDING",
         }),
       ),
@@ -62,7 +62,7 @@ export const createReturn = async (req, res) => {
         where: { sale_id, status: "PENDING" },
       });
 
-      const returnedItemIds = new Set(allReturns.map((r) => r.Sale_item_id));
+      const returnedItemIds = new Set(allReturns.map((r) => r.sale_item_id));
 
       // Check if all sale items are pending return
       const allReturned = allSaleItems.every((si) =>
