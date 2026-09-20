@@ -115,7 +115,7 @@ export const createSale = async (req, res, next) => {
         continue;
       }
 
-      // ⭐ FIFO: oldest expiring batch first
+      // FIFO: oldest expiring batch first
       const batches = await ProductBatch.findAll({
         where: {
           product_id: product.id,
@@ -257,7 +257,6 @@ export const createSale = async (req, res, next) => {
         },
       ],
     });
-    console.log("Sale created successfully:", saleWithDetails);
     res.status(201).json({
       success: true,
       message: "Sale completed successfully",

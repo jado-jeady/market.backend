@@ -5,8 +5,8 @@ import sequelize from "../config/database.js";
 const { Product, Category, SaleItem, User, PriceChange, ProductBatch } = db;
 
 /* =====================================================
-   GET ALL PRODUCTS (WITH FILTERS + PAGINATION)
-===================================================== */
+    GET ALL PRODUCTS (WITH FILTERS + PAGINATION)
+  ===================================================== */
 export const getAllProducts = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -173,8 +173,8 @@ const applyBatchPricing = (productInstance) => {
 };
 
 /* =====================================================
-   GET PRODUCT BY ID
-===================================================== */
+    GET PRODUCT BY ID
+  ===================================================== */
 export const getProductById = async (req, res, next) => {
   try {
     const product = await Product.findByPk(req.params.id, {
@@ -203,8 +203,8 @@ export const getProductById = async (req, res, next) => {
 };
 
 /* =====================================================
-   CREATE PRODUCT
-===================================================== */
+    CREATE PRODUCT
+  ===================================================== */
 export const createProduct = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -324,8 +324,8 @@ export const createProduct = async (req, res, next) => {
 };
 
 /* =====================================================
-   DELETE PRODUCT
-===================================================== */
+    DELETE PRODUCT
+  ===================================================== */
 export const deleteProduct = async (req, res, next) => {
   try {
     const product = await Product.findByPk(req.params.id);
@@ -362,8 +362,8 @@ export const deleteProduct = async (req, res, next) => {
 };
 
 /* =====================================================
-   GET PRODUCT BY BARCODE (POS SAFE)
-===================================================== */
+    GET PRODUCT BY BARCODE (POS SAFE)
+  ===================================================== */
 
 export const getProductByBarcode = async (req, res, next) => {
   try {
@@ -502,54 +502,106 @@ export const getAllBaristaItems = async (req, res, next) => {
 // };
 
 export const updateProduct = async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
   try {
-    const product = await Product.findByPk(req.params.id);
+    const product = await Product.findByPk(req.params.id, { transaction });
+
     if (!product) {
+      await transaction.rollback();
       return res.status(404).json({
         success: false,
         message: "Product not found",
       });
     }
+
     // Prevent duplicate barcode
     if (req.body.barcode && req.body.barcode !== product.barcode) {
       const exists = await Product.findOne({
         where: { barcode: req.body.barcode },
+        transaction,
       });
       if (exists) {
+        await transaction.rollback();
         return res.status(400).json({
           success: false,
           message: "Barcode already exists",
         });
       }
     }
-    // Store old price for price change tracking
+
+    // Track price changes
     const oldPrice = parseFloat(product.selling_price);
     const newPrice = req.body.selling_price
       ? parseFloat(req.body.selling_price)
       : oldPrice;
 
     // Update product
-    await product.update(req.body);
+    await product.update(req.body, { transaction });
 
-    // Track price change if selling price changed
+    // ⭐ If selling price changed, sync all active non-zero batches
+    let syncedBatches = [];
     if (oldPrice !== newPrice) {
-      await PriceChange.create({
-        product_id: product.id,
-        old_price: oldPrice,
-        new_price: newPrice,
-        price_difference: newPrice - oldPrice,
-        changed_by: req.user.id,
-        change_reason:
-          req.body.change_reason || "Price updated via product edit",
-        change_type: newPrice > oldPrice ? "INCREASE" : "DECREASE",
+      const batchesToSync = await ProductBatch.findAll({
+        where: {
+          product_id: product.id,
+          is_active: true,
+          stock_quantity: { [Op.gt]: 0 },
+        },
+        transaction,
       });
 
-      console.log(
-        `💰 Price change for product ${product.id}: ${oldPrice} → ${newPrice} by user ${req.user.id}`,
-      );
+      for (const batch of batchesToSync) {
+        const batchOldPrice = parseFloat(batch.selling_price);
+        if (batchOldPrice === newPrice) continue; // already same, skip
+
+        // ✅ ONE log row per batch (no product-level duplicate)
+        await PriceChange.create(
+          {
+            product_id: product.id,
+            old_price: batchOldPrice,
+            new_price: newPrice,
+            price_difference: newPrice - batchOldPrice,
+            changed_by: req.user.id,
+            change_reason:
+              req.body.change_reason || "Price updated via product edit",
+            change_type: newPrice > batchOldPrice ? "INCREASE" : "DECREASE",
+            affected_batch_id: batch.id, // ← per-batch reference
+          },
+          { transaction },
+        );
+
+        await batch.update({ selling_price: newPrice }, { transaction });
+        syncedBatches.push({
+          batch_id: batch.id,
+          batch_code: batch.batch_code,
+          old_price: batchOldPrice,
+          new_price: newPrice,
+        });
+      }
+
+      // If there are NO active batches (product has 0 stock everywhere),
+      // still log ONE product-level row so the price change isn't lost
+      if (batchesToSync.length === 0) {
+        await PriceChange.create(
+          {
+            product_id: product.id,
+            old_price: oldPrice,
+            new_price: newPrice,
+            price_difference: newPrice - oldPrice,
+            changed_by: req.user.id,
+            change_reason:
+              req.body.change_reason || "Price updated via product edit",
+            change_type: newPrice > oldPrice ? "INCREASE" : "DECREASE",
+            affected_batch_id: null,
+          },
+          { transaction },
+        );
+      }
     }
 
-    // Fetch the updated product with price changes
+    await transaction.commit();
+
+    // Return updated product with price history
     const updatedProduct = await Product.findByPk(req.params.id, {
       include: [
         {
@@ -575,10 +627,14 @@ export const updateProduct = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Product updated successfully",
+      message: syncedBatches.length
+        ? `Product updated. ${syncedBatches.length} active batch(es) price-synced.`
+        : "Product updated successfully",
       data: updatedProduct,
+      synced_batches: syncedBatches,
     });
   } catch (error) {
+    await transaction.rollback();
     next(error);
   }
 };
@@ -759,8 +815,8 @@ export const getAllPriceChanges = async (req, res) => {
 };
 
 /* =====================================================
-   GET ALL BATCHES FOR A PRODUCT
-===================================================== */
+    GET ALL BATCHES FOR A PRODUCT
+  ===================================================== */
 export const getProductBatches = async (req, res, next) => {
   try {
     const product = await Product.findByPk(req.params.id);
@@ -782,8 +838,8 @@ export const getProductBatches = async (req, res, next) => {
 };
 
 /* =====================================================
-   RECEIVE NEW STOCK (create a new batch + sync prices)
-===================================================== */
+    RECEIVE NEW STOCK (create a new batch + sync prices)
+  ===================================================== */
 export const receiveStock = async (req, res, next) => {
   const transaction = await db.sequelize.transaction();
   try {
@@ -899,6 +955,28 @@ export const receiveStock = async (req, res, next) => {
         });
       }
     }
+    // If no other batches existed, log a product-level change so price history isn't empty
+    if (update_existing_batches && updatedBatches.length === 0) {
+      const oldProductSelling = parseFloat(product.selling_price);
+      if (oldProductSelling !== newSelling) {
+        await PriceChange.create(
+          {
+            product_id: product.id,
+            old_price: oldProductSelling,
+            new_price: newSelling,
+            price_difference: newSelling - oldProductSelling,
+            changed_by: user_id,
+            change_reason:
+              change_reason ||
+              `Product shelf price updated via new batch ${batchCode}`,
+            change_type:
+              newSelling > oldProductSelling ? "INCREASE" : "DECREASE",
+            affected_batch_id: null,
+          },
+          { transaction },
+        );
+      }
+    }
 
     // ---- 5. Update product cached stock + default prices ----
     const totalStock = await ProductBatch.sum("stock_quantity", {
@@ -915,26 +993,6 @@ export const receiveStock = async (req, res, next) => {
       },
       { transaction },
     );
-
-    // ---- 6. Log product-level price change (in addition to batch-level) ----
-    const oldProductSelling = parseFloat(product.selling_price);
-    if (oldProductSelling !== newSelling) {
-      await PriceChange.create(
-        {
-          product_id: product.id,
-          old_price: oldProductSelling,
-          new_price: newSelling,
-          price_difference: newSelling - oldProductSelling,
-          changed_by: user_id,
-          change_reason:
-            change_reason ||
-            `Product shelf price updated via new batch ${batchCode}`,
-          change_type: newSelling > oldProductSelling ? "INCREASE" : "DECREASE",
-          affected_batch_id: newBatch.id, // reference the triggering batch
-        },
-        { transaction },
-      );
-    }
 
     await transaction.commit();
 
