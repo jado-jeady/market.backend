@@ -13,15 +13,31 @@ import {
   getPriceChangeSummary,
   getAllPriceChanges,
   getProductBatches,
+  getAllBatches,
   receiveStock,
+  getProductsWithBatches,
+  getExpiryReport,
 } from "../controllers/product.controller.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
 import { productValidation } from "../utils/validators.js";
 import { getBaristaCategoriesProducts } from "../controllers/category.controller.js";
 
 const router = express.Router();
+router.use(authenticate);
 
 router.get("/", getAllProducts);
+// Get price change summary for dashboard
+router.get("/price-changes/summary", authorize("Admin"), getPriceChangeSummary);
+
+// Get all price changes with filters
+router.get("/price-changes", authorize("Admin"), getAllPriceChanges);
+// Batches list — must be BEFORE /:id
+router.get(
+  "/batches",
+  authenticate,
+  authorize("Admin", "Storekeeper"),
+  getAllBatches,
+);
 
 router.get("/consumables", getAllConsumables);
 router.get("/barcode/:barcode", getProductByBarcode);
@@ -29,6 +45,13 @@ router.get("/barcode/:barcode", getProductByBarcode);
 // Barista specific routes
 router.get("/barista-items", getAllBaristaItems);
 router.get("/barista-menu", getBaristaCategoriesProducts);
+// Products with batches (for stock management) — must be BEFORE /:id
+router.get(
+  "/products-with-batches",
+  authenticate,
+  authorize("Admin", "Storekeeper"),
+  getProductsWithBatches,
+);
 
 // ⭐ Batch + stock receiving routes (must come before /:id)
 router.post(
@@ -37,6 +60,14 @@ router.post(
   authorize("Admin", "Storekeeper"),
   receiveStock,
 );
+// expiring products report route
+router.get(
+  "/expiry-report",
+  authenticate,
+  authorize("Admin", "Storekeeper"),
+  getExpiryReport,
+);
+
 router.get(
   "/:id/batches",
   authenticate,
@@ -48,7 +79,6 @@ router.get(
 router.get("/:id", getProductById);
 
 // Protected routes (require authentication)
-router.use(authenticate);
 
 // Product creation/modification requires ADMIN role
 // Update product (with price change tracking)
@@ -65,13 +95,6 @@ router.get(
   authorize("Admin", "Storekeeper"),
   getProductPriceHistory,
 );
-
-// Get price change summary for dashboard
-router.get("/price-changes/summary", authorize("Admin"), getPriceChangeSummary);
-
-// Get all price changes with filters
-router.get("/price-changes", authorize("Admin"), getAllPriceChanges);
-
 router.post("/", authorize("Admin"), productValidation, createProduct);
 router.delete("/:id", authorize("Admin"), deleteProduct);
 

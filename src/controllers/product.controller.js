@@ -1012,3 +1012,456 @@ export const receiveStock = async (req, res, next) => {
     next(error);
   }
 };
+
+/* =====================================================
+   GET ALL BATCHES (with filters + pagination)
+===================================================== */
+export const getAllBatches = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      product_id,
+      status, // "active" | "inactive" | "expired" | "expiring_soon"
+      low_stock,
+      sort_by = "received_date",
+      sort_order = "DESC",
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const where = {};
+    const productWhere = {};
+
+    if (product_id) {
+      where.product_id = product_id;
+    }
+
+    if (search) {
+      productWhere[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { barcode: { [Op.iLike]: `%${search}%` } },
+        { sku: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    const today = new Date();
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 30);
+
+    if (status === "active") {
+      where.is_active = true;
+      where.stock_quantity = { [Op.gt]: 0 };
+    } else if (status === "inactive") {
+      where.is_active = false;
+    } else if (status === "expired") {
+      where.expire_date = { [Op.lt]: today };
+      where.stock_quantity = { [Op.gt]: 0 };
+    } else if (status === "expiring_soon") {
+      where.expire_date = { [Op.between]: [today, soon] };
+      where.stock_quantity = { [Op.gt]: 0 };
+    }
+
+    if (low_stock === "true") {
+      where.stock_quantity = { [Op.gt]: 0, [Op.lte]: 10 };
+    }
+
+    // Validate sort fields (whitelist to prevent SQL injection)
+    const allowedSort = [
+      "received_date",
+      "expire_date",
+      "stock_quantity",
+      "selling_price",
+      "buying_price",
+      "created_at",
+    ];
+    const sortField = allowedSort.includes(sort_by) ? sort_by : "received_date";
+    const sortDir = sort_order.toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    const { count, rows } = await ProductBatch.findAndCountAll({
+      where,
+      limit: parseInt(limit),
+      offset,
+      order: [[sortField, sortDir]],
+      distinct: true,
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "barcode", "sku", "min_stock"],
+          where: Object.keys(productWhere).length ? productWhere : undefined,
+          required: true,
+        },
+      ],
+    });
+
+    // Augment each batch with computed flags
+    const batches = rows.map((b) => {
+      const plain = b.toJSON();
+      const expireDate = plain.expire_date ? new Date(plain.expire_date) : null;
+      return {
+        ...plain,
+        is_expired: expireDate ? expireDate < today : false,
+        is_expiring_soon: expireDate
+          ? expireDate >= today && expireDate <= soon
+          : false,
+        is_low_stock: plain.stock_quantity <= (plain.product?.min_stock || 10),
+        total_value:
+          parseFloat(plain.stock_quantity) * parseFloat(plain.buying_price),
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: batches,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    console.error("getAllBatches error:", error);
+    next(error);
+  }
+};
+
+/* =====================================================
+   GET PRODUCTS WITH THEIR BATCHES (grouped, paginated)
+   Pagination is on PRODUCTS, not batches.
+===================================================== */
+export const getProductsWithBatches = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      category_id,
+      status,
+      sort_by = "name",
+      sort_order = "ASC",
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const today = new Date();
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 30);
+
+    const productWhere = {
+      is_active: true,
+      track_stock: true,
+    };
+
+    if (search) {
+      productWhere[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { barcode: { [Op.iLike]: `%${search}%` } },
+        { sku: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    if (category_id && category_id !== "all") {
+      productWhere.category_id = category_id;
+    }
+
+    // ⭐ Batch filter — applied to the JOIN, not post-filter
+    const batchWhere = {
+      is_active: true,
+      stock_quantity: { [Op.gt]: 0 },
+    };
+    let requireBatch = false;
+
+    if (status === "has_active") {
+      requireBatch = true;
+    } else if (status === "expired") {
+      requireBatch = true;
+      batchWhere.expire_date = { [Op.lt]: today };
+    } else if (status === "expiring_soon") {
+      requireBatch = true;
+      batchWhere.expire_date = { [Op.between]: [today, soon] };
+    } else if (status === "low_stock") {
+      // Low stock is a product-level check on total stock
+      // We'll handle it after fetching
+    }
+
+    const allowedSort = [
+      "name",
+      "stock_quantity",
+      "created_at",
+      "selling_price",
+    ];
+    const sortField = allowedSort.includes(sort_by) ? sort_by : "name";
+    const sortDir = sort_order.toUpperCase() === "DESC" ? "DESC" : "ASC";
+
+    const { count, rows: products } = await Product.findAndCountAll({
+      where: productWhere,
+      limit: parseInt(limit),
+      offset,
+      order: [[sortField, sortDir]],
+      distinct: true, // ← REQUIRED when using hasMany include
+      include: [
+        {
+          model: Category,
+          as: "category",
+          attributes: ["id", "name"],
+        },
+        {
+          model: ProductBatch,
+          as: "batches",
+          required: requireBatch, // ⭐ INNER JOIN when filtering by batch
+          where: requireBatch ? batchWhere : undefined,
+        },
+      ],
+    });
+
+    const productIds = products.map((p) => p.id);
+
+    // Fetch ALL batches for those products (for display, not filtering)
+    const allBatches = await ProductBatch.findAll({
+      where: { product_id: { [Op.in]: productIds } },
+      order: [
+        ["received_date", "DESC"],
+        ["created_at", "DESC"],
+      ],
+    });
+
+    const batchesByProduct = {};
+    for (const batch of allBatches) {
+      if (!batchesByProduct[batch.product_id]) {
+        batchesByProduct[batch.product_id] = [];
+      }
+      batchesByProduct[batch.product_id].push(batch);
+    }
+
+    let result = products.map((product) => {
+      const plain = product.toJSON();
+      const batches = (batchesByProduct[product.id] || []).map((b) => {
+        const bj = b.toJSON();
+        const expireDate = bj.expire_date ? new Date(bj.expire_date) : null;
+        return {
+          ...bj,
+          is_expired: expireDate ? expireDate < today : false,
+          is_expiring_soon: expireDate
+            ? expireDate >= today && expireDate <= soon
+            : false,
+        };
+      });
+
+      const activeBatches = batches.filter(
+        (b) => b.stock_quantity > 0 && b.is_active,
+      );
+
+      const totalStock = activeBatches.reduce(
+        (sum, b) => sum + b.stock_quantity,
+        0,
+      );
+
+      const totalValue = activeBatches.reduce(
+        (sum, b) => sum + b.stock_quantity * parseFloat(b.buying_price || 0),
+        0,
+      );
+
+      const avgCost = totalStock > 0 ? totalValue / totalStock : 0;
+      const expiringSoonCount = activeBatches.filter(
+        (b) => b.is_expiring_soon,
+      ).length;
+      const expiredCount = activeBatches.filter((b) => b.is_expired).length;
+      const lowStock = totalStock > 0 && totalStock <= (plain.min_stock || 10);
+
+      return {
+        ...plain,
+        batches,
+        batch_count: batches.length,
+        active_batch_count: activeBatches.length,
+        total_batch_stock: totalStock,
+        average_cost: Math.round(avgCost * 100) / 100,
+        has_expiring_soon: expiringSoonCount > 0,
+        expiring_soon_count: expiringSoonCount,
+        has_expired: expiredCount > 0,
+        expired_count: expiredCount,
+        is_low_stock: lowStock,
+        selling_price: activeBatches[0]?.selling_price || plain.selling_price,
+        buying_price: activeBatches[0]?.buying_price || plain.buying_price,
+      };
+    });
+
+    // Low stock still needs post-filter (aggregate-based)
+    if (status === "low_stock") {
+      result = result.filter((p) => p.is_low_stock);
+    }
+
+    return res.json({
+      success: true,
+      data: result,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    console.error("getProductsWithBatches error:", error);
+    next(error);
+  }
+};
+
+/* =====================================================
+   EXPIRY REPORT — flat list of expiring/expired batches
+===================================================== */
+export const getExpiryReport = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 50,
+      range = "30", // "expired" | "7" | "30" | "90" | "all"
+      search,
+      category_id,
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const where = {
+      is_active: true,
+      stock_quantity: { [Op.gt]: 0 },
+      expire_date: { [Op.ne]: null }, // must have an expiry date
+    };
+
+    if (range === "expired") {
+      where.expire_date = { [Op.lt]: today };
+    } else if (range === "7") {
+      const d = new Date(today);
+      d.setDate(d.getDate() + 7);
+      where.expire_date = { [Op.between]: [today, d] };
+    } else if (range === "30") {
+      const d = new Date(today);
+      d.setDate(d.getDate() + 30);
+      where.expire_date = { [Op.between]: [today, d] };
+    } else if (range === "90") {
+      const d = new Date(today);
+      d.setDate(d.getDate() + 90);
+      where.expire_date = { [Op.between]: [today, d] };
+    } else if (range === "all") {
+      // any expiry date in the future OR past — no upper bound
+      // (we already filter for expire_date != null)
+    }
+
+    const productWhere = { is_active: true };
+    if (search) {
+      productWhere[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { barcode: { [Op.iLike]: `%${search}%` } },
+        { sku: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+    if (category_id && category_id !== "all") {
+      productWhere.category_id = category_id;
+    }
+
+    const { count, rows: batches } = await ProductBatch.findAndCountAll({
+      where,
+      limit: parseInt(limit),
+      offset,
+      order: [["expire_date", "ASC"]], // soonest first
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "barcode", "sku", "category_id"],
+          where: productWhere,
+          required: true,
+          include: [
+            {
+              model: Category,
+              as: "category",
+              attributes: ["id", "name"],
+            },
+          ],
+        },
+      ],
+    });
+
+    // Summary across ALL batches (not just this page)
+    const allMatching = await ProductBatch.findAll({
+      where,
+      include: [
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "min_stock"],
+          where: productWhere,
+          required: true,
+        },
+      ],
+    });
+
+    const soon7 = new Date(today);
+    soon7.setDate(soon7.getDate() + 7);
+    const soon30 = new Date(today);
+    soon30.setDate(soon30.getDate() + 30);
+
+    const summary = {
+      total_batches: allMatching.length,
+      total_units: 0,
+      total_value: 0,
+      expired_count: 0,
+      expired_value: 0,
+      in_7d_count: 0,
+      in_7d_value: 0,
+      in_30d_count: 0,
+      in_30d_value: 0,
+    };
+
+    for (const b of allMatching) {
+      const qty = b.stock_quantity;
+      const val = qty * parseFloat(b.buying_price || 0);
+      summary.total_units += qty;
+      summary.total_value += val;
+
+      const exp = new Date(b.expire_date);
+      if (exp < today) {
+        summary.expired_count += 1;
+        summary.expired_value += val;
+      } else if (exp <= soon7) {
+        summary.in_7d_count += 1;
+        summary.in_7d_value += val;
+      } else if (exp <= soon30) {
+        summary.in_30d_count += 1;
+        summary.in_30d_value += val;
+      }
+    }
+
+    // Augment each row with days_left
+    const data = batches.map((b) => {
+      const plain = b.toJSON();
+      const exp = plain.expire_date ? new Date(plain.expire_date) : null;
+      const daysLeft = exp
+        ? Math.ceil((exp - today) / (1000 * 60 * 60 * 24))
+        : null;
+      return {
+        ...plain,
+        days_left: daysLeft,
+        is_expired: exp ? exp < today : false,
+        total_value: plain.stock_quantity * parseFloat(plain.buying_price || 0),
+      };
+    });
+
+    return res.json({
+      success: true,
+      data,
+      summary,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(count / limit),
+      },
+    });
+  } catch (error) {
+    console.error("getExpiryReport error:", error);
+    next(error);
+  }
+};
