@@ -247,9 +247,12 @@ export const getStockAdjustments = async (req, res) => {
   try {
     const adjustments = await StockAdjustment.findAll({
       include: [
-        { model: Product, attributes: ["id", "name", "barcode"] },
-        { model: User, attributes: ["id", "username"] },
-        { model: ProductBatch, as: "batch", attributes: ["id", "batch_code"] },
+        {
+          model: Product,
+          as: "product",
+          attributes: ["id", "name", "barcode"],
+        },
+        { model: User, as: "user", attributes: ["id", "username"] },
       ],
       order: [["created_at", "DESC"]],
       limit: 1000,
