@@ -49,10 +49,12 @@ SaleItem.belongsTo(Sale, {
   as: "sale",
 });
 
-StockAdjustment.belongsTo(Product, { foreignKey: "product_id" });
-StockAdjustment.belongsTo(User, { foreignKey: "user_id" });
-Product.hasMany(StockAdjustment, { foreignKey: "product_id" });
-
+StockAdjustment.belongsTo(Product, { foreignKey: "product_id", as: "product" });
+StockAdjustment.belongsTo(User, { foreignKey: "user_id", as: "user" });
+Product.hasMany(StockAdjustment, {
+  foreignKey: "product_id",
+  as: "stock_adjustments",
+});
 // Product - SaleItem (One to Many)
 Product.hasMany(SaleItem, {
   foreignKey: "product_id",
@@ -144,21 +146,14 @@ Sale.hasMany(Return, { foreignKey: "sale_id" });
 Return.belongsTo(Sale, { foreignKey: "sale_id" });
 
 // SaleItem - Return (new link)
-SaleItem.hasMany(Return, { foreignKey: "sale_item_id" });
-Return.belongsTo(SaleItem, { foreignKey: "sale_item_id" });
 
 // Product - Return (optional, since SaleItem already links to Product)
 Product.hasMany(Return, { foreignKey: "product_id" });
 Return.belongsTo(Product, { foreignKey: "product_id" });
 
 // Requested by (cashier)
-User.hasMany(Return, { foreignKey: "requested_by", as: "RequestedReturns" });
-Return.belongsTo(User, { foreignKey: "requested_by", as: "Requester" });
 
 // Approved by (admin)
-
-User.hasMany(Return, { foreignKey: "approved_by", as: "ApprovedReturns" });
-Return.belongsTo(User, { foreignKey: "approved_by", as: "Approver" });
 
 // A damage report belongs to a product
 Damage.belongsTo(Product, { foreignKey: "product_id", as: "product" });
@@ -196,6 +191,25 @@ ProductBatch.hasMany(StockAdjustment, {
 StockAdjustment.belongsTo(ProductBatch, {
   foreignKey: "batch_id",
   as: "batch",
+});
+
+// Return ↔ SaleItem
+Return.belongsTo(SaleItem, {
+  foreignKey: "sale_item_id",
+  as: "SaleItem",
+});
+SaleItem.hasMany(Return, { foreignKey: "sale_item_id", as: "Returns" });
+
+// Return ↔ User (requested_by)
+Return.belongsTo(User, {
+  foreignKey: "requested_by",
+  as: "Requester",
+});
+
+// Return ↔ User (approved_by)
+Return.belongsTo(User, {
+  foreignKey: "approved_by",
+  as: "Approver",
 });
 
 const db = {

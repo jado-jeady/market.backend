@@ -1,45 +1,39 @@
-// routes/report.routes.js
 import express from "express";
 import {
-  generateSalesReport,
-  generateStockReport,
-  generateFinancialReport,
-  generateCustomerReport,
-  generateCategoryReport,
-  downloadReportExcel,
-  getAllReports,
-  getReportById,
+  getSalesReport,
+  getProfitReport,
+  getVatReport,
+  getShiftReport,
+  getStockMovementReport,
+  getPurchaseReport,
+  getReportFilters,
+  // Keep the legacy endpoints if you still use them anywhere:
+  // generateSalesReport,
+  // generateStockReport,
+  // generateFinancialReport,
+  // generateCustomerReport,
+  // generateCategoryReport,
+  // downloadReportExcel,
+  // getAllReports,
+  // getReportById,
 } from "../controllers/report.controller.js";
 import { authorize, authenticate } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.use(authenticate); // Apply authentication middleware to all routes
+router.use(authenticate);
 
-// Generate reports
-router.post(
-  "/generate/sales",
-  authorize("Admin", "Storekeeper"),
-  generateSalesReport,
-);
-router.post(
-  "/generate/stock",
-  authorize("Admin", "Storekeeper"),
-  generateStockReport,
-);
-router.post("/generate/financial", authorize("Admin"), generateFinancialReport);
-router.post("/generate/customer", authorize("Admin"), generateCustomerReport);
-router.post("/generate/category", authorize("Admin"), generateCategoryReport);
-
-// Download report
+/* ---- New live reports ---- */
+router.get("/sales", authorize("Admin", "Storekeeper"), getSalesReport);
+router.get("/profit", authorize("Admin"), getProfitReport);
+router.get("/vat", authorize("Admin"), getVatReport);
+router.get("/shifts", authorize("Admin"), getShiftReport);
 router.get(
-  "/download/:id",
+  "/stock-movements",
   authorize("Admin", "Storekeeper"),
-  downloadReportExcel,
+  getStockMovementReport,
 );
-
-// Get reports
-router.get("/", authorize("Admin", "Storekeeper"), getAllReports);
-router.get("/:id", authorize("Admin", "Storekeeper"), getReportById);
+router.get("/purchases", authorize("Admin", "Storekeeper"), getPurchaseReport);
+router.get("/filters", authorize("Admin", "Storekeeper"), getReportFilters);
 
 export default router;

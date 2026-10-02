@@ -20,7 +20,7 @@ export const createReturn = async (req, res) => {
           sale_id,
           product_id: item.product_id,
           sale_item_id: item.sale_item_id,
-          status: ["PENDING", "APPROVED"], // check both
+          status: { [Op.in]: ["PENDING", "APPROVED"] },
         },
       });
 
@@ -95,22 +95,32 @@ export const getAllReturns = async (req, res) => {
       include: [
         {
           model: Sale,
-          attributes: ["id", "invoice_number", "status"],
+          attributes: ["id", "invoice_number", "status", "total_amount"],
         },
         {
           model: SaleItem,
-          attributes: ["id", "quantity"],
-          include: [{ model: Product, attributes: ["id", "name"] }],
+          as: "SaleItem",
+          attributes: [
+            "id",
+            "quantity",
+            "is_refunded",
+            "unit_price",
+            "product_name",
+          ],
+          include: [
+            {
+              model: Product,
+              as: "product",
+              attributes: ["id", "name", "barcode"],
+            },
+          ],
         },
-        {
-          model: User,
-          as: "Requester",
-          attributes: ["id", "full_name"],
-        },
+        { model: User, as: "Requester", attributes: ["id", "full_name"] },
+        { model: User, as: "Approver", attributes: ["id", "full_name"] },
       ],
+      order: [["created_at", "DESC"]],
     });
-
-    res.json(returns);
+    res.json({ success: true, data: returns });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch returns" });
@@ -121,113 +131,77 @@ export const getAllReturns = async (req, res) => {
 // Helper function to update sale totals after refund
 const updateSaleTotals = async (saleId) => {
   const sale = await Sale.findByPk(saleId, {
-    include: [{ model: SaleItem, include: [Product] }],
+    include: [{ model: SaleItem, as: "items" }],
   });
 
   if (!sale) return;
 
-  // Get all approved returns for this sale
+  // Get all approved returns for this sale (grouped by sale_item_id)
   const approvedReturns = await Return.findAll({
-    where: {
-      sale_id: saleId,
-      status: "APPROVED",
-    },
+    where: { sale_id: saleId, status: "APPROVED" },
   });
 
-  // Create a map of refunded quantities by product
-  const refundedQuantities = {};
-  approvedReturns.forEach((refund) => {
-    refundedQuantities[refund.product_id] =
-      (refundedQuantities[refund.product_id] || 0) + refund.quantity;
-  });
+  // Map by sale_item_id
+  const refundedBySaleItem = {};
+  for (const r of approvedReturns) {
+    refundedBySaleItem[r.sale_item_id] =
+      (refundedBySaleItem[r.sale_item_id] || 0) + r.quantity;
+  }
 
-  // Recalculate sale totals excluding refunded items
   let newSubtotal = 0;
   let newVatTotal = 0;
   let newTotalAmount = 0;
 
-  for (const item of sale.SaleItems) {
-    const refundedQty = refundedQuantities[item.product_id] || 0;
-    const effectiveQuantity = item.quantity - refundedQty;
+  for (const item of sale.items) {
+    const refundedQty = refundedBySaleItem[item.id] || 0;
+    const effectiveQty = item.quantity - refundedQty;
 
-    if (effectiveQuantity > 0) {
-      const itemSubtotal = effectiveQuantity * item.unit_price;
-      const itemVat = (itemSubtotal * (item.vat_rate || 0)) / 100;
-      const itemTotal = itemSubtotal + itemVat - (item.discount || 0);
+    if (effectiveQty <= 0) continue;
 
-      newSubtotal += itemSubtotal;
-      newVatTotal += itemVat;
-      newTotalAmount += itemTotal;
-    }
+    // Ratio of the item's original price kept
+    const ratio = effectiveQty / item.quantity;
+    const itemSubtotal = parseFloat(item.unit_price || 0) * effectiveQty;
+    const itemVat = parseFloat(item.vat_amount || 0) * ratio;
+
+    newSubtotal += itemSubtotal;
+    newVatTotal += itemVat;
+    newTotalAmount += itemSubtotal + itemVat;
   }
 
-  // Update sale with new totals
   sale.subtotal = newSubtotal;
   sale.vat_total = newVatTotal;
   sale.total_amount = newTotalAmount;
   await sale.save();
-
-  // Update SaleItems - mark as refunded instead of deleting
-  for (const item of sale.SaleItems) {
-    const refundedQty = refundedQuantities[item.product_id] || 0;
-    if (refundedQty >= item.quantity) {
-      // Mark as fully refunded
-      item.is_refunded = true;
-      await item.save();
-    } else if (refundedQty > 0) {
-      // Update quantity for partially refunded items
-      item.quantity = item.quantity - refundedQty;
-      await item.save();
-    }
-  }
 };
 
-// Update sale status based on returns
-const updateSaleStatus = async (sale_id) => {
-  const sale = await Sale.findByPk(sale_id, {
+const updateSaleStatus = async (saleId) => {
+  const sale = await Sale.findByPk(saleId, {
     include: [
-      {
-        model: Return,
-        as: "Returns",
-      },
-      {
-        model: SaleItem,
-        as: "SaleItems",
-      },
+      { model: Return, as: "Returns" },
+      { model: SaleItem, as: "items" },
     ],
   });
-
   if (!sale) return;
 
   const returns = sale.Returns || [];
+  const items = sale.items || [];
+
   const hasPending = returns.some((r) => r.status === "PENDING");
   const hasApproved = returns.some((r) => r.status === "APPROVED");
-  const hasRejected = returns.some((r) => r.status === "REJECTED");
+  const hasRejected = returns.some((r) => r.status === "CANCELLED");
 
-  // Check which items are refunded
-  let allItemsRefunded = true;
-  let someItemsRefunded = false;
+  // A sale is "fully refunded" when every line is refunded
+  const allRefunded =
+    items.length > 0 && items.every((item) => item.is_refunded);
+  const someRefunded = items.some((item) => item.is_refunded);
 
-  for (const item of sale.SaleItems) {
-    if (item.is_refunded) {
-      someItemsRefunded = true;
-    } else {
-      allItemsRefunded = false;
-    }
-  }
-
-  // Determine sale status
-  if (hasPending) {
-    sale.status = "PENDING_REFUND";
-  } else if (allItemsRefunded && someItemsRefunded) {
-    sale.status = "FULLY_REFUNDED";
-  } else if (someItemsRefunded) {
-    sale.status = "PARTIALLY_REFUNDED";
-  } else if (hasRejected && !hasApproved) {
-    sale.status = "REFUND_REJECTED";
-  } else {
-    sale.status = "REFUNDED";
-  }
+  if (hasPending) sale.status = "PENDING_REFUND";
+  else if (allRefunded) sale.status = "FULLY_REFUNDED";
+  else if (someRefunded) sale.status = "PARTIALLY_REFUNDED";
+  // partially refunded but all returns rejected
+  else if (hasApproved && !hasRejected) sale.status = "PARTIALLY_REFUNDED";
+  else if (hasRejected && !hasApproved) sale.status = "CANCELLED";
+  else sale.status = "COMPLETED";
 
   await sale.save();
 };
@@ -237,12 +211,12 @@ export const approveReturn = async (req, res) => {
   const transaction = await db.sequelize.transaction();
   try {
     const { id } = req.params;
-    const { approved_by } = req.body;
+    // Fallback: use authenticated user's id if approved_by not provided
+    const approved_by = req.body.approved_by || req.user?.id;
 
-    const returnRecord = await Return.findByPk(id, {
-      include: [{ model: Sale, include: [SaleItem] }],
-      transaction,
-    });
+    console.log(`[approveReturn] id=${id} approved_by=${approved_by}`);
+
+    const returnRecord = await Return.findByPk(id, { transaction });
 
     if (!returnRecord) {
       await transaction.rollback();
@@ -251,10 +225,12 @@ export const approveReturn = async (req, res) => {
 
     if (returnRecord.status !== "PENDING") {
       await transaction.rollback();
-      return res.status(400).json({ error: "Return is already processed" });
+      return res.status(400).json({
+        error: `Return already ${returnRecord.status.toLowerCase()}`,
+      });
     }
 
-    // Find the original sale item to get its batch_id
+    // Find the original sale item
     const originalSaleItem = await SaleItem.findOne({
       where: {
         sale_id: returnRecord.sale_id,
@@ -265,14 +241,22 @@ export const approveReturn = async (req, res) => {
 
     if (!originalSaleItem) {
       await transaction.rollback();
-      return res.status(400).json({ error: "Original sale item not found" });
+      return res.status(400).json({
+        error: "Original sale item not found for this return",
+      });
     }
 
-    //  Restore stock into the SAME batch it was sold from
+    // Restore stock
     const product = await Product.findByPk(returnRecord.product_id, {
       transaction,
     });
-    if (product && product.track_stock) {
+
+    if (!product) {
+      await transaction.rollback();
+      return res.status(400).json({ error: "Product not found" });
+    }
+
+    if (product.track_stock) {
       if (originalSaleItem.batch_id) {
         // Preferred path: restore to same batch
         const batch = await ProductBatch.findByPk(originalSaleItem.batch_id, {
@@ -285,28 +269,59 @@ export const approveReturn = async (req, res) => {
             `Return #${returnRecord.id} for sale #${returnRecord.sale_id}`,
             transaction,
           );
+          console.log(`[approveReturn] Restored to batch ${batch.id}`);
+        } else {
+          // Batch was deleted — fall back to new batch
+          const newBatch = await ProductBatch.create(
+            {
+              product_id: product.id,
+              batch_code: `RET-${returnRecord.id}-${Date.now()}`,
+              buying_price:
+                parseFloat(originalSaleItem.buying_price) ||
+                parseFloat(product.buying_price) ||
+                0,
+              selling_price:
+                parseFloat(originalSaleItem.unit_price) ||
+                parseFloat(product.selling_price) ||
+                0,
+              stock_quantity: 0,
+              is_active: true,
+            },
+            { transaction },
+          );
+          await newBatch.addStock(
+            returnRecord.quantity,
+            approved_by,
+            `Return #${returnRecord.id} (missing batch, new batch created)`,
+            transaction,
+          );
         }
       } else {
-        // Old sale without batch: create a new "RETURN" batch
+        // No batch_id (pre-batch sale) → create new batch
         const newBatch = await ProductBatch.create(
           {
             product_id: product.id,
             batch_code: `RET-${returnRecord.id}-${Date.now()}`,
             buying_price:
-              originalSaleItem.buying_price || product.buying_price || 0,
-            selling_price: originalSaleItem.unit_price || product.selling_price,
+              parseFloat(originalSaleItem.buying_price) ||
+              parseFloat(product.buying_price) ||
+              0,
+            selling_price:
+              parseFloat(originalSaleItem.unit_price) ||
+              parseFloat(product.selling_price) ||
+              0,
             stock_quantity: 0,
             is_active: true,
           },
           { transaction },
         );
-
         await newBatch.addStock(
           returnRecord.quantity,
           approved_by,
           `Return #${returnRecord.id} (pre-batch sale, new batch created)`,
           transaction,
         );
+        console.log(`[approveReturn] Created new batch ${newBatch.id}`);
       }
 
       // Sync cached product stock
@@ -318,23 +333,31 @@ export const approveReturn = async (req, res) => {
         { stock_quantity: totalStock || 0 },
         { transaction },
       );
+      console.log(`[approveReturn] Product stock synced to ${totalStock}`);
     }
 
-    // Update return status
+    // Mark return as approved
     returnRecord.status = "APPROVED";
     returnRecord.approved_by = approved_by;
-    returnRecord.approved_at = new Date();
     await returnRecord.save({ transaction });
 
-    // Update sale totals + status (existing helpers)
-    await updateSaleTotals(returnRecord.sale_id);
-    await updateSaleStatus(returnRecord.sale_id);
+    // Mark sale item as refunded
+    await originalSaleItem.update({ is_refunded: true }, { transaction });
 
     await transaction.commit();
 
+    // Recompute sale totals + status (outside transaction, since these
+    // mutate the sale based on all returns)
+    await updateSaleTotals(returnRecord.sale_id);
+    await updateSaleStatus(returnRecord.sale_id);
+
     const updatedReturn = await Return.findByPk(id, {
       include: [
-        { model: Product, attributes: ["id", "name", "stock_quantity"] },
+        {
+          model: Product,
+          as: "Product", // depends on your association alias
+          attributes: ["id", "name", "stock_quantity"],
+        },
         {
           model: Sale,
           attributes: ["id", "status", "subtotal", "total_amount"],
@@ -343,15 +366,20 @@ export const approveReturn = async (req, res) => {
     });
 
     res.json({
+      success: true,
       message: "Return approved successfully",
       return: updatedReturn,
     });
   } catch (err) {
     await transaction.rollback();
-    console.error("Error approving return:", err);
-    res.status(500).json({ error: "Failed to approve return" });
+    console.error("[approveReturn] ERROR:", err);
+    res.status(500).json({
+      error: "Failed to approve return",
+      details: err.message,
+    });
   }
 };
+
 // Reject return
 export const rejectReturn = async (req, res) => {
   try {
@@ -359,6 +387,7 @@ export const rejectReturn = async (req, res) => {
     const { rejected_by, rejection_reason } = req.body;
 
     const returnRecord = await Return.findByPk(id);
+    console.log(`[rejectReturn] id=${id} rejected_by=${rejected_by}`);
 
     if (!returnRecord) {
       return res.status(404).json({ error: "Return not found" });
@@ -370,7 +399,7 @@ export const rejectReturn = async (req, res) => {
 
     // Update return status
     returnRecord.status = "REJECTED";
-    returnRecord.rejected_by = rejected_by;
+    returnRecord.approved_by = rejected_by;
     returnRecord.rejection_reason = rejection_reason;
     returnRecord.rejected_at = new Date();
     await returnRecord.save();
@@ -383,7 +412,7 @@ export const rejectReturn = async (req, res) => {
       return: returnRecord,
     });
   } catch (err) {
-    console.error("Error rejecting return:", err);
+    console.error("[rejectReturn] ERROR :", err);
     res.status(500).json({ error: "Failed to reject return" });
   }
 };

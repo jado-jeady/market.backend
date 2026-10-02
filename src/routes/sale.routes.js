@@ -13,6 +13,7 @@ import { saleValidation } from "../utils/validators.js";
 import {
   approveReturn,
   createReturn,
+  rejectReturn,
   getAllReturns,
   getReturnsByCashier,
 } from "../controllers/Returns.controller.js";
@@ -45,10 +46,16 @@ router.get(
 router.get("/my-sale", authenticate, getMySales);
 
 // RETURN ROUTES
-router.post("/return", authorize("Cashier"), saleValidation, createReturn);
+router.post(
+  "/return",
+  authorize("Cashier", "Admin"),
+  saleValidation,
+  createReturn,
+);
 router.get("/return", authorize("Admin"), getAllReturns);
 router.get("/return/:id", authenticate, getReturnsByCashier);
 router.put("/return/:id/approve", authorize("Admin"), approveReturn);
+router.put("/return/:id/reject", authorize("Admin"), rejectReturn);
 
 // ADMIN can view all sales
 router.get("/", authorize("Admin"), getAllSales);
